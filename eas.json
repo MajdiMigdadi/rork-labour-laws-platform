@@ -4,16 +4,13 @@
     "appVersionSource": "local"
   },
   "build": {
-    "base": {
-      "node": "18.18.0",
-      "env": {
-        "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
-      }
-    },
-  "build": {
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "node": "18.18.0",
+      "env": {
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
+      },
       "ios": {
         "simulator": true
       },
@@ -23,6 +20,10 @@
     },
     "preview": {
       "distribution": "internal",
+      "node": "18.18.0",
+      "env": {
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
+      },
       "ios": {
         "simulator": false
       },
@@ -32,6 +33,10 @@
     },
     "production": {
       "distribution": "store",
+      "node": "18.18.0",
+      "env": {
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
+      },
       "ios": {
         "resourceClass": "m1-medium"
       },
@@ -41,17 +46,6 @@
     }
   },
   "submit": {
-    "production": {
-      "ios": {
-        "appleId": "YOUR_APPLE_ID@email.com",
-        "ascAppId": "YOUR_APP_STORE_CONNECT_APP_ID",
-        "appleTeamId": "YOUR_APPLE_TEAM_ID"
-      },
-      "android": {
-        "serviceAccountKeyPath": "./google-service-account.json",
-        "track": "production"
-      }
-    }
+    "production": {}
   }
 }
-
