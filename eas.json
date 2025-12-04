@@ -1,7 +1,15 @@
 {
   "cli": {
-    "version": ">= 5.0.0"
+    "version": ">= 5.0.0",
+    "appVersionSource": "local"
   },
+  "build": {
+    "base": {
+      "node": "18.18.0",
+      "env": {
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
+      }
+    },
   "build": {
     "development": {
       "developmentClient": true,
