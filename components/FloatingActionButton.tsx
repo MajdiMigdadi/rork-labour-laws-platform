@@ -30,16 +30,8 @@ export default function FloatingActionButton() {
   const { t, isRTL } = useLanguage();
   const { user } = useAuth();
   
-  // Hide FAB on auth pages, onboarding, landing, and for guests on profile
-  const isAuthPage = pathname?.includes('/(auth)') || pathname?.includes('/auth') || pathname?.includes('/login');
-  const isOnboarding = pathname?.includes('/onboarding') || pathname?.includes('/landing');
-  const isGuestProfile = pathname?.includes('/profile') && !user;
-  
-  if (isAuthPage || isOnboarding || isGuestProfile) {
-    return null;
-  }
+  // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   const [isOpen, setIsOpen] = useState(false);
-  
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const backdropAnim = useRef(new Animated.Value(0)).current;
   const buttonAnims = useRef([
@@ -47,6 +39,12 @@ export default function FloatingActionButton() {
     new Animated.Value(0),
     new Animated.Value(0),
   ]).current;
+  
+  // Hide FAB on auth pages, onboarding, landing, and for guests on profile
+  const isAuthPage = pathname?.includes('/(auth)') || pathname?.includes('/auth') || pathname?.includes('/login');
+  const isOnboarding = pathname?.includes('/onboarding') || pathname?.includes('/landing');
+  const isGuestProfile = pathname?.includes('/profile') && !user;
+  const shouldHide = isAuthPage || isOnboarding || isGuestProfile;
 
   const openMenu = useCallback(() => {
     setIsOpen(true);
@@ -156,6 +154,11 @@ export default function FloatingActionButton() {
     inputRange: [0, 1],
     outputRange: [0, 0.5],
   });
+
+  // Now we can safely return null after all hooks
+  if (shouldHide) {
+    return null;
+  }
 
   return (
     <>
