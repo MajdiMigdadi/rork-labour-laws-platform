@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,13 +16,23 @@ import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/useTheme';
 import { useReputation } from '@/contexts/ReputationContext';
+import { useLanguage } from '@/contexts/LanguageContext';
+import FlagDisplay from '@/components/FlagDisplay';
 
 export default function AskQuestionScreen() {
   const router = useRouter();
   const theme = useTheme();
   const { user } = useAuth();
   const { countries, categories, addQuestion } = useData();
+  const { t, isRTL, getTranslatedName } = useLanguage();
   const { onQuestionAsked } = useReputation();
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!user) {
+      router.replace('/(auth)/login?from=ask-question');
+    }
+  }, [user, router]);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [selectedCountry, setSelectedCountry] = useState<string>('');
@@ -43,23 +53,19 @@ export default function AskQuestionScreen() {
 
   const handleSubmit = async () => {
     if (!title.trim()) {
-      Alert.alert('Error', 'Please enter a question title');
+      Alert.alert(t.error || 'Error', t.errorEnterTitle || 'Please enter a question title');
       return;
     }
     if (!content.trim()) {
-      Alert.alert('Error', 'Please enter question details');
+      Alert.alert(t.error || 'Error', t.errorEnterDetails || 'Please enter question details');
       return;
     }
     if (!selectedCountry) {
-      Alert.alert('Error', 'Please select a country');
+      Alert.alert(t.error || 'Error', t.errorSelectCountry || 'Please select a country');
       return;
     }
     if (!selectedCategory) {
-      Alert.alert('Error', 'Please select a category');
-      return;
-    }
-    if (!user) {
-      Alert.alert('Error', 'You must be logged in to ask a question');
+      Alert.alert(t.error || 'Error', t.errorSelectCategory || 'Please select a category');
       return;
     }
 
@@ -75,27 +81,35 @@ export default function AskQuestionScreen() {
 
       await onQuestionAsked(user.id);
 
-      Alert.alert('Success', 'Your question has been posted! You earned 5 reputation points.', [
-        {
-          text: 'OK',
-          onPress: () => router.back(),
-        },
-      ]);
+      // Navigate to Q&A page immediately
+      router.push('/(tabs)/questions');
+      
+      // Show success message
+      Alert.alert(t.success || 'Success', t.successQuestionPosted || 'Your question has been posted! You earned 5 reputation points.');
     } catch (error) {
       console.error('Failed to submit question:', error);
-      Alert.alert('Error', 'Failed to post question. Please try again.');
+      Alert.alert(t.error || 'Error', t.errorPostQuestion || 'Failed to post question. Please try again.');
     }
   };
+
+  const handleGoBack = () => {
+    router.push('/(tabs)/questions');
+  };
+
+  // Don't render if user is not logged in (will redirect)
+  if (!user) {
+    return null;
+  }
 
   return (
     <>
       <Stack.Screen 
         options={{ 
-          title: 'Ask a Question', 
+          title: t.askQuestion || 'Ask a Question', 
           headerShown: true,
           headerLeft: () => (
-            <TouchableOpacity onPress={() => router.back()} style={{ marginLeft: 8 }}>
-              <ArrowLeft size={24} color={theme.text} />
+            <TouchableOpacity onPress={handleGoBack} style={{ marginLeft: 8 }}>
+              <ArrowLeft size={24} color={theme.text} style={isRTL && { transform: [{ rotate: '180deg' }] }} />
             </TouchableOpacity>
           ),
         }} 
@@ -108,40 +122,42 @@ export default function AskQuestionScreen() {
           <View style={styles.content}>
             <View style={styles.header}>
               <MessageCircle size={32} color={theme.primary} />
-              <Text style={[styles.headerTitle, { color: theme.text }]}>Ask the Community</Text>
+              <Text style={[styles.headerTitle, { color: theme.text }]}>{t.askCommunity || 'Ask the Community'}</Text>
               <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>
-                Get expert answers to your labour law questions
+                {t.getExpertAnswers || 'Get expert answers to your labour law questions'}
               </Text>
             </View>
 
             <View style={styles.form}>
               <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: theme.text }]}>Question Title *</Text>
+                <Text style={[styles.label, { color: theme.text }, isRTL && styles.rtlText]}>{t.questionTitle || 'Question Title'} *</Text>
                 <TextInput
-                  style={[styles.input, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
-                  placeholder="What is your question?"
+                  style={[styles.input, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }, isRTL && styles.rtlText]}
+                  placeholder={t.whatIsYourQuestion || 'What is your question?'}
                   value={title}
                   onChangeText={setTitle}
                   placeholderTextColor={theme.textSecondary}
+                  textAlign={isRTL ? 'right' : 'left'}
                 />
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: theme.text }]}>Details *</Text>
+                <Text style={[styles.label, { color: theme.text }, isRTL && styles.rtlText]}>{t.details || 'Details'} *</Text>
                 <TextInput
-                  style={[styles.input, styles.textArea, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
-                  placeholder="Provide more context and details..."
+                  style={[styles.input, styles.textArea, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }, isRTL && styles.rtlText]}
+                  placeholder={t.provideContext || 'Provide more context and details...'}
                   value={content}
                   onChangeText={setContent}
                   multiline
                   numberOfLines={6}
                   textAlignVertical="top"
                   placeholderTextColor={theme.textSecondary}
+                  textAlign={isRTL ? 'right' : 'left'}
                 />
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: theme.text }]}>Country *</Text>
+                <Text style={[styles.label, { color: theme.text }, isRTL && styles.rtlText]}>{t.country || 'Country'} *</Text>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -157,7 +173,7 @@ export default function AskQuestionScreen() {
                       ]}
                       onPress={() => setSelectedCountry(country.id)}
                     >
-                      <Text style={styles.chipEmoji}>{country.flag}</Text>
+                      <FlagDisplay flag={country.flag} size="small" />
                       <Text
                         style={[
                           styles.chipText,
@@ -165,7 +181,7 @@ export default function AskQuestionScreen() {
                           selectedCountry === country.id && styles.chipTextSelected,
                         ]}
                       >
-                        {country.name}
+                        {getTranslatedName(country)}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -173,8 +189,8 @@ export default function AskQuestionScreen() {
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: theme.text }]}>Category *</Text>
-                <View style={styles.categoryGrid}>
+                <Text style={[styles.label, { color: theme.text }, isRTL && styles.rtlText]}>{t.category || 'Category'} *</Text>
+                <View style={[styles.categoryGrid, isRTL && styles.rtlWrap]}>
                   {categories.map(category => (
                     <TouchableOpacity
                       key={category.id}
@@ -192,7 +208,7 @@ export default function AskQuestionScreen() {
                           selectedCategory === category.id && styles.categoryChipTextSelected,
                         ]}
                       >
-                        {category.name}
+                        {getTranslatedName(category)}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -200,28 +216,29 @@ export default function AskQuestionScreen() {
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: theme.text }]}>Tags (Optional)</Text>
-                <View style={styles.tagInputContainer}>
+                <Text style={[styles.label, { color: theme.text }, isRTL && styles.rtlText]}>{t.tagsOptional || 'Tags (Optional)'}</Text>
+                <View style={[styles.tagInputContainer, isRTL && styles.rtl]}>
                   <TextInput
-                    style={[styles.tagInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
-                    placeholder="Add a tag..."
+                    style={[styles.tagInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }, isRTL && styles.rtlText]}
+                    placeholder={t.addTag || 'Add a tag...'}
                     value={tagInput}
                     onChangeText={setTagInput}
                     onSubmitEditing={handleAddTag}
                     placeholderTextColor={theme.textSecondary}
+                    textAlign={isRTL ? 'right' : 'left'}
                   />
                   <TouchableOpacity
                     style={[styles.addTagButton, { backgroundColor: theme.secondary }]}
                     onPress={handleAddTag}
                     disabled={!tagInput.trim() || tags.length >= 5}
                   >
-                    <Text style={styles.addTagButtonText}>Add</Text>
+                    <Text style={styles.addTagButtonText}>{t.add || 'Add'}</Text>
                   </TouchableOpacity>
                 </View>
                 {tags.length > 0 && (
-                  <View style={styles.tagsContainer}>
+                  <View style={[styles.tagsContainer, isRTL && styles.rtlWrap]}>
                     {tags.map(tag => (
-                      <View key={tag} style={[styles.tag, { backgroundColor: theme.primary }]}>
+                      <View key={tag} style={[styles.tag, { backgroundColor: theme.primary }, isRTL && styles.rtl]}>
                         <Text style={styles.tagText}>{tag}</Text>
                         <TouchableOpacity
                           onPress={() => handleRemoveTag(tag)}
@@ -233,8 +250,8 @@ export default function AskQuestionScreen() {
                     ))}
                   </View>
                 )}
-                <Text style={[styles.hint, { color: theme.textSecondary }]}>
-                  {tags.length}/5 tags • Press Add or Enter to add a tag
+                <Text style={[styles.hint, { color: theme.textSecondary }, isRTL && styles.rtlText]}>
+                  {tags.length}/5 {t.tagsHint || 'tags • Press Add or Enter to add a tag'}
                 </Text>
               </View>
             </View>
@@ -246,7 +263,7 @@ export default function AskQuestionScreen() {
             style={[styles.submitButton, { backgroundColor: theme.primary }]}
             onPress={handleSubmit}
           >
-            <Text style={styles.submitButtonText}>Post Question</Text>
+            <Text style={styles.submitButtonText}>{t.postQuestion || 'Post Question'}</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -263,7 +280,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
-    paddingBottom: 100,
+    paddingBottom: 20,
   },
   header: {
     alignItems: 'center',
@@ -387,16 +404,32 @@ const styles = StyleSheet.create({
   },
   footer: {
     padding: 16,
+    paddingBottom: 100,
     borderTopWidth: 1,
   },
   submitButton: {
-    paddingVertical: 16,
-    borderRadius: 12,
+    paddingVertical: 18,
+    borderRadius: 16,
     alignItems: 'center',
+    shadowColor: '#6366f1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   submitButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600' as const,
+  },
+  rtl: {
+    flexDirection: 'row-reverse',
+  },
+  rtlText: {
+    textAlign: 'right',
+  },
+  rtlWrap: {
+    flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
   },
 });

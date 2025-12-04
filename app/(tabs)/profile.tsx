@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, Switch } from 'react-native';
-import { LogOut, Award, TrendingUp, MessageCircle, Languages, Edit2, MapPin, Briefcase, Phone, Globe, Scale, Mail, Lock, User as UserIcon, Moon, Sun, Bell, Trophy, Sparkles } from 'lucide-react-native';
-import Colors from '@/constants/colors';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, Platform, Switch } from 'react-native';
+import { LogOut, Award, TrendingUp, MessageCircle, Edit2, MapPin, Briefcase, Globe, User as UserIcon, Moon, Sun, Bell, Sparkles, ChevronRight, Shield, Star, CheckCircle, Calendar, Languages } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter } from 'expo-router';
@@ -11,23 +10,18 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { useReputation } from '@/contexts/ReputationContext';
 import { useData } from '@/contexts/DataContext';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function ProfileScreen() {
-  const { user, users, login, register, logout } = useAuth();
+  const { user, users, logout } = useAuth();
   const { t, language, changeLanguage, isRTL } = useLanguage();
   const { getUserReputation, getLeaderboard, getRarityColor } = useReputation();
   const { questions, answers } = useData();
   const router = useRouter();
   const theme = useTheme();
   const { settings, updateSettings } = useSettings();
-  const { settings: notificationSettings, updateSettings: updateNotificationSettings, permissionStatus, requestPermissions } = useNotifications();
+  const { settings: notificationSettings, updateSettings: updateNotificationSettings } = useNotifications();
   const [editModalVisible, setEditModalVisible] = useState(false);
-  const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
 
   const handleEditProfile = () => {
     setEditModalVisible(true);
@@ -49,20 +43,7 @@ export default function ProfileScreen() {
 
   const handleLanguageToggle = () => {
     const newLang = language === 'en' ? 'ar' : 'en';
-    Alert.alert(
-      'Change Language',
-      'The app will reload to apply the new language. Continue?',
-      [
-        { text: t.cancel, style: 'cancel' },
-        {
-          text: 'OK',
-          onPress: () => {
-            changeLanguage(newLang);
-            Alert.alert('Success', 'Please reload the app for changes to take effect.');
-          },
-        },
-      ]
-    );
+    changeLanguage(newLang);
   };
 
   const handleThemeToggle = async () => {
@@ -70,465 +51,457 @@ export default function ProfileScreen() {
     await updateSettings({ themeMode: newTheme });
   };
 
-  const getLevelColor = (level: string) => {
+  const getLevelColor = (level: string): [string, string] => {
     switch (level) {
       case 'beginner':
-        return theme.secondary;
+        return ['#10b981', '#34d399'];
       case 'intermediate':
-        return theme.primary;
+        return ['#6366f1', '#8b5cf6'];
       case 'expert':
-        return theme.accent;
+        return ['#f59e0b', '#fbbf24'];
       default:
-        return theme.secondary;
+        return ['#10b981', '#34d399'];
     }
   };
 
-  const handleSubmit = async () => {
-    setError('');
-    
-    if (!email || !password || (!isLogin && !name)) {
-      setError('Please fill in all fields');
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      let success;
-      if (isLogin) {
-        success = await login(email, password);
-        if (!success) {
-          setError('Invalid credentials. Try: admin@labourlaw.com or john@example.com');
-        }
-      } else {
-        success = await register(email, password, name);
-      }
-
-      if (success) {
-        setEmail('');
-        setPassword('');
-        setName('');
-      }
-    } catch (err) {
-      setError('An error occurred. Please try again.');
-      console.error('Auth error:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // Guest Screen - Redirect to Login
   if (!user) {
     return (
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={[styles.container, { backgroundColor: theme.background }]}
-      >
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        {/* Background decorations */}
+        <View style={[styles.guestBgCircle1, { backgroundColor: theme.primary + '10' }]} />
+        <View style={[styles.guestBgCircle2, { backgroundColor: '#8B5CF610' }]} />
+        
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.guestScrollContent}
+          showsVerticalScrollIndicator={false}
         >
-          <View style={styles.header}>
-            <View style={[styles.iconContainer, { backgroundColor: theme.backgroundSecondary }]}>
-              <Scale size={48} color={theme.primary} strokeWidth={2} />
-            </View>
-            <Text style={[styles.title, { color: theme.text }]}>Labour Law Hub</Text>
-            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-              Access labour laws worldwide
+          {/* Language Toggle */}
+          <TouchableOpacity 
+            style={[styles.guestLanguageToggle, { backgroundColor: theme.backgroundSecondary }]}
+            onPress={handleLanguageToggle}
+            activeOpacity={0.8}
+          >
+            <Globe size={16} color={theme.primary} />
+            <Text style={[styles.guestLanguageText, { color: theme.text }]}>
+              {language === 'en' ? 'العربية' : 'English'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Icon */}
+          <View style={styles.guestIconSection}>
+            <LinearGradient
+              colors={[theme.primary, '#8B5CF6']}
+              style={styles.guestIconGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <UserIcon size={48} color="#fff" strokeWidth={1.5} />
+            </LinearGradient>
+          </View>
+
+          {/* Welcome Text */}
+          <View style={styles.guestTextSection}>
+            <Text style={[styles.guestTitle, { color: theme.text }, isRTL && styles.rtlText]}>
+              {language === 'ar' ? 'مرحباً بك' : 'Welcome Guest'}
+            </Text>
+            <Text style={[styles.guestSubtitle, { color: theme.textSecondary }, isRTL && styles.rtlText]}>
+              {language === 'ar' 
+                ? 'سجل دخولك أو أنشئ حساباً للوصول إلى ملفك الشخصي'
+                : 'Sign in or create an account to access your profile'}
             </Text>
           </View>
 
-          <View style={styles.form}>
-            <View style={[styles.tabs, { backgroundColor: theme.backgroundSecondary }]}>
-              <TouchableOpacity
-                style={[styles.tab, isLogin && { ...styles.activeTab, backgroundColor: theme.primary }]}
-                onPress={() => {
-                  setIsLogin(true);
-                  setError('');
-                }}
-              >
-                <Text style={[styles.tabText, { color: theme.textSecondary }, isLogin && styles.activeTabText]}>
-                  Login
+          {/* Features List */}
+          <View style={styles.guestFeatures}>
+            {[
+              { icon: Award, text: language === 'ar' ? 'اكسب السمعة والشارات' : 'Earn reputation & badges', color: '#6366F1' },
+              { icon: MessageCircle, text: language === 'ar' ? 'اسأل وأجب على الأسئلة' : 'Ask & answer questions', color: '#10B981' },
+              { icon: TrendingUp, text: language === 'ar' ? 'تتبع تقدمك' : 'Track your progress', color: '#F59E0B' },
+            ].map((feature, index) => (
+              <View key={index} style={[styles.guestFeatureItem, { backgroundColor: theme.card }]}>
+                <View style={[styles.guestFeatureIcon, { backgroundColor: feature.color + '15' }]}>
+                  <feature.icon size={20} color={feature.color} />
+                </View>
+                <Text style={[styles.guestFeatureText, { color: theme.text }, isRTL && styles.rtlText]}>
+                  {feature.text}
                 </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.tab, !isLogin && { ...styles.activeTab, backgroundColor: theme.primary }]}
-                onPress={() => {
-                  setIsLogin(false);
-                  setError('');
-                }}
-              >
-                <Text style={[styles.tabText, { color: theme.textSecondary }, !isLogin && styles.activeTabText]}>
-                  Register
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {!isLogin && (
-              <View style={[styles.inputContainer, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
-                <UserIcon size={20} color={theme.textSecondary} style={styles.inputIcon} />
-                <TextInput
-                  style={[styles.input, { color: theme.text }]}
-                  placeholder="Full Name"
-                  value={name}
-                  onChangeText={setName}
-                  autoCapitalize="words"
-                  placeholderTextColor={theme.textSecondary}
-                />
               </View>
-            )}
+            ))}
+          </View>
 
-            <View style={[styles.inputContainer, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
-              <Mail size={20} color={theme.textSecondary} style={styles.inputIcon} />
-              <TextInput
-                style={[styles.input, { color: theme.text }]}
-                placeholder="Email"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                placeholderTextColor={theme.textSecondary}
-              />
-            </View>
-
-            <View style={[styles.inputContainer, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
-              <Lock size={20} color={theme.textSecondary} style={styles.inputIcon} />
-              <TextInput
-                style={[styles.input, { color: theme.text }]}
-                placeholder="Password"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                placeholderTextColor={theme.textSecondary}
-              />
-            </View>
-
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-            <TouchableOpacity
-              style={[styles.button, { backgroundColor: theme.primary }]}
-              onPress={handleSubmit}
-              disabled={isLoading}
+          {/* Action Buttons */}
+          <View style={styles.guestActions}>
+            <TouchableOpacity 
+              style={styles.guestPrimaryButton}
+              onPress={() => router.push('/(auth)/login')}
+              activeOpacity={0.9}
             >
-              {isLoading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.buttonText}>
-                  {isLogin ? 'Login' : 'Create Account'}
+              <LinearGradient
+                colors={[theme.primary, '#8B5CF6']}
+                style={styles.guestPrimaryButtonGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Text style={styles.guestPrimaryButtonText}>
+                  {language === 'ar' ? 'تسجيل الدخول' : 'Sign In'}
                 </Text>
-              )}
+                <ChevronRight size={20} color="#fff" style={isRTL && { transform: [{ rotate: '180deg' }] }} />
+              </LinearGradient>
             </TouchableOpacity>
 
-            {isLogin && (
-              <View style={[styles.demoContainer, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
-                <Text style={[styles.demoText, { color: theme.text }]}>Demo accounts:</Text>
-                <Text style={[styles.demoEmail, { color: theme.textSecondary }]}>admin@labourlaw.com (Admin)</Text>
-                <Text style={[styles.demoEmail, { color: theme.textSecondary }]}>john@example.com (User)</Text>
-              </View>
-            )}
+            <TouchableOpacity 
+              style={[styles.guestSecondaryButton, { borderColor: theme.border }]}
+              onPress={() => router.push('/(auth)/login')}
+              activeOpacity={0.8}
+            >
+              <Sparkles size={20} color={theme.primary} />
+              <Text style={[styles.guestSecondaryButtonText, { color: theme.text }]}>
+                {language === 'ar' ? 'إنشاء حساب جديد' : 'Create New Account'}
+              </Text>
+            </TouchableOpacity>
           </View>
+
+          {/* Continue as Guest */}
+          <TouchableOpacity 
+            style={styles.guestContinueButton}
+            onPress={() => router.push('/(tabs)/home')}
+          >
+            <Text style={[styles.guestContinueText, { color: theme.textSecondary }]}>
+              {language === 'ar' ? 'استمر كزائر' : 'Continue as Guest'}
+            </Text>
+          </TouchableOpacity>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </View>
     );
   }
 
+  // Profile Screen (logged in)
+  const userQuestions = questions.filter(q => q.userId === user.id).length;
+  const userAnswers = answers.filter(a => a.userId === user.id).length;
+  const userBadges = getUserReputation(user.id).badges;
+  const acceptedAnswers = answers.filter(a => a.userId === user.id && a.isAccepted).length;
+  const memberSince = new Date(user.joinedDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.backgroundSecondary }]}>
-      <View style={[styles.header, { backgroundColor: theme.background, borderBottomColor: theme.border }]}>
-        <View style={styles.avatarWrapper}>
-          {user.avatar ? (
-            <Image source={{ uri: user.avatar }} style={styles.avatar} />
-          ) : (
-            <View style={[styles.avatar, { backgroundColor: theme.primary }]}>
-              <Text style={styles.avatarText}>{user.name.charAt(0).toUpperCase()}</Text>
+    <ScrollView 
+      style={[styles.container, { backgroundColor: theme.background }]}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Profile Header - Full Width Cover */}
+      <LinearGradient
+        colors={['#1e1b4b', '#312e81', '#4338ca']}
+        style={styles.profileHeader}
+      >
+        <View style={styles.headerPattern}>
+          {[...Array(6)].map((_, i) => (
+            <View key={i} style={[styles.patternDot, { left: `${15 + i * 15}%`, top: `${20 + (i % 3) * 25}%` }]} />
+          ))}
+        </View>
+      </LinearGradient>
+
+      {/* Profile Card - Overlapping */}
+      <View style={styles.profileCardContainer}>
+        <View style={[styles.profileCard, { backgroundColor: theme.card }]}>
+          {/* Avatar */}
+          <View style={styles.avatarContainer}>
+            {user.avatar ? (
+              <Image source={{ uri: user.avatar }} style={styles.avatar} />
+            ) : (
+              <LinearGradient
+                colors={getLevelColor(user.level)}
+                style={styles.avatar}
+              >
+                <Text style={styles.avatarText}>{user.name.charAt(0).toUpperCase()}</Text>
+              </LinearGradient>
+            )}
+            <TouchableOpacity 
+              style={styles.editAvatarBtn} 
+              onPress={handleEditProfile}
+              activeOpacity={0.8}
+            >
+              <Edit2 size={12} color="#fff" />
+            </TouchableOpacity>
+            
+            {/* Online indicator */}
+            <View style={styles.onlineBadge} />
+          </View>
+
+          {/* Name & Email */}
+          <Text style={[styles.userName, { color: theme.text }]}>{user.name}</Text>
+          <Text style={[styles.userEmail, { color: theme.textSecondary }]}>{user.email}</Text>
+
+          {/* Level & Role Badges */}
+          <View style={styles.badgeRow}>
+            <LinearGradient
+              colors={getLevelColor(user.level)}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.levelPill}
+            >
+              <Star size={12} color="#fff" />
+              <Text style={styles.levelPillText}>
+                {user.level === 'beginner' ? t.beginner : user.level === 'intermediate' ? t.intermediate : t.expert}
+              </Text>
+            </LinearGradient>
+            
+            {user.role === 'admin' && (
+              <View style={styles.adminPill}>
+                <Shield size={12} color="#6366f1" />
+                <Text style={[styles.adminPillText, { color: '#6366f1' }]}>{t.adminRole}</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Member Since */}
+          <View style={styles.memberSinceRow}>
+            <Calendar size={14} color={theme.textSecondary} />
+            <Text style={[styles.memberSinceText, { color: theme.textSecondary }]}>
+              {t.memberSince} {memberSince}
+            </Text>
+          </View>
+
+          {/* Quick Stats Row */}
+          <View style={styles.quickStats}>
+            <View style={styles.quickStatItem}>
+              <Text style={[styles.quickStatValue, { color: theme.text }]}>{user.reputation}</Text>
+              <Text style={[styles.quickStatLabel, { color: theme.textSecondary }]}>{t.reputation}</Text>
             </View>
-          )}
-          <TouchableOpacity style={[styles.editAvatarButton, { backgroundColor: theme.primary, borderColor: theme.background }]} onPress={handleEditProfile}>
-            <Edit2 size={16} color="#fff" />
-          </TouchableOpacity>
+            <View style={[styles.quickStatDivider, { backgroundColor: theme.border }]} />
+            <View style={styles.quickStatItem}>
+              <Text style={[styles.quickStatValue, { color: theme.text }]}>{userQuestions}</Text>
+              <Text style={[styles.quickStatLabel, { color: theme.textSecondary }]}>{t.questions}</Text>
+            </View>
+            <View style={[styles.quickStatDivider, { backgroundColor: theme.border }]} />
+            <View style={styles.quickStatItem}>
+              <Text style={[styles.quickStatValue, { color: theme.text }]}>{userAnswers}</Text>
+              <Text style={[styles.quickStatLabel, { color: theme.textSecondary }]}>{t.answers}</Text>
+            </View>
+          </View>
         </View>
-        <Text style={[styles.name, { color: theme.text }, isRTL && styles.rtlText]}>{user.name}</Text>
-        <Text style={[styles.email, { color: theme.textSecondary }, isRTL && styles.rtlText]}>{user.email}</Text>
-        <View style={[styles.levelBadge, { backgroundColor: getLevelColor(user.level) }]}>
-          <Text style={styles.levelText}>
-            {user.level === 'beginner' ? t.beginner : user.level === 'intermediate' ? t.intermediate : t.expert}
-          </Text>
+      </View>
+
+      {/* Activity Stats Cards */}
+      <View style={styles.statsRow}>
+        <View style={[styles.statsCard, { backgroundColor: theme.card }]}>
+          <View style={[styles.statsIconBg, { backgroundColor: '#eef2ff' }]}>
+            <Award size={22} color="#6366f1" />
+          </View>
+          <View style={styles.statsCardContent}>
+            <Text style={[styles.statsCardValue, { color: theme.text }]}>{user.reputation}</Text>
+            <Text style={[styles.statsCardLabel, { color: theme.textSecondary }]}>{t.reputation}</Text>
+          </View>
         </View>
-        <TouchableOpacity style={[styles.editButton, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]} onPress={handleEditProfile}>
-          <Edit2 size={18} color={theme.primary} />
-          <Text style={[styles.editButtonText, { color: theme.primary }]}>Edit Profile</Text>
+        
+        <View style={[styles.statsCard, { backgroundColor: theme.card }]}>
+          <View style={[styles.statsIconBg, { backgroundColor: '#d1fae5' }]}>
+            <CheckCircle size={22} color="#10b981" />
+          </View>
+          <View style={styles.statsCardContent}>
+            <Text style={[styles.statsCardValue, { color: theme.text }]}>{acceptedAnswers}</Text>
+            <Text style={[styles.statsCardLabel, { color: theme.textSecondary }]}>{t.resolved}</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Edit Profile Action */}
+      <View style={styles.section}>
+        <TouchableOpacity 
+          style={[styles.actionRow, { backgroundColor: theme.card }]}
+          onPress={handleEditProfile}
+          activeOpacity={0.7}
+        >
+          <View style={styles.actionRowLeft}>
+            <View style={[styles.actionIconBg, { backgroundColor: '#eef2ff' }]}>
+              <Edit2 size={18} color="#6366f1" />
+            </View>
+            <View>
+              <Text style={[styles.actionRowTitle, { color: theme.text }]}>{t.editProfile}</Text>
+              <Text style={[styles.actionRowSub, { color: theme.textSecondary }]}>{t.updateInfo}</Text>
+            </View>
+          </View>
+          <ChevronRight size={20} color={theme.textSecondary} />
         </TouchableOpacity>
       </View>
 
-      <View style={styles.statsSection}>
-        <View style={[styles.statCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Award size={32} color={theme.accent} />
-          <Text style={[styles.statNumber, { color: theme.text }]}>{user.reputation}</Text>
-          <Text style={[styles.statLabel, { color: theme.textSecondary }, isRTL && styles.rtlText]}>{t.reputation}</Text>
-        </View>
-        <View style={[styles.statCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <MessageCircle size={32} color={theme.primary} />
-          <Text style={[styles.statNumber, { color: theme.text }]}>{questions.filter(q => q.userId === user.id).length}</Text>
-          <Text style={[styles.statLabel, { color: theme.textSecondary }, isRTL && styles.rtlText]}>{t.questions}</Text>
-        </View>
-        <View style={[styles.statCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <TrendingUp size={32} color={theme.secondary} />
-          <Text style={[styles.statNumber, { color: theme.text }]}>{answers.filter(a => a.userId === user.id).length}</Text>
-          <Text style={[styles.statLabel, { color: theme.textSecondary }, isRTL && styles.rtlText]}>{t.answers}</Text>
-        </View>
-      </View>
-
-      {getUserReputation(user.id).badges.length > 0 && (
+      {/* Badges Section */}
+      {userBadges.length > 0 && (
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }, isRTL && styles.rtlText]}>Badges Earned</Text>
-          <View style={[styles.badgesContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            {getUserReputation(user.id).badges.map((badge) => (
-              <View key={badge.id} style={[styles.badgeItem, { backgroundColor: theme.backgroundSecondary, borderColor: getRarityColor(badge.rarity) }]}>
-                <Text style={styles.badgeIcon}>{badge.icon}</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>{t.badgesEarned}</Text>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.badgesScroll}
+          >
+            {userBadges.map((badge) => (
+              <View 
+                key={badge.id} 
+                style={[styles.badgeCard, { backgroundColor: theme.card }]}
+              >
+                <View style={[styles.badgeIconBg, { backgroundColor: `${getRarityColor(badge.rarity)}15` }]}>
+                  <Text style={styles.badgeIcon}>{badge.icon}</Text>
+                </View>
                 <Text style={[styles.badgeName, { color: theme.text }]}>{badge.name}</Text>
-                <Text style={[styles.badgeDescription, { color: theme.textSecondary }]}>{badge.description}</Text>
                 <View style={[styles.badgeRarity, { backgroundColor: getRarityColor(badge.rarity) }]}>
                   <Text style={styles.badgeRarityText}>{badge.rarity}</Text>
                 </View>
               </View>
             ))}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* About Section */}
+      {(user.bio || user.location || user.company) && (
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>{t.about}</Text>
+          <View style={[styles.aboutCard, { backgroundColor: theme.card }]}>
+            {user.bio && (
+              <Text style={[styles.bioText, { color: theme.text }]}>{user.bio}</Text>
+            )}
+            {user.location && (
+              <View style={styles.aboutRow}>
+                <MapPin size={16} color={theme.textSecondary} />
+                <Text style={[styles.aboutText, { color: theme.textSecondary }]}>{user.location}</Text>
+              </View>
+            )}
+            {user.company && (
+              <View style={styles.aboutRow}>
+                <Briefcase size={16} color={theme.textSecondary} />
+                <Text style={[styles.aboutText, { color: theme.textSecondary }]}>{user.company}</Text>
+              </View>
+            )}
           </View>
         </View>
       )}
 
+      {/* Settings Section */}
       <View style={styles.section}>
-        <View style={[styles.leaderboardHeader, isRTL && styles.rtl]}>
-          <Trophy size={24} color={theme.primary} />
-          <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 0 }, isRTL && styles.rtlText]}>Leaderboard</Text>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>{t.settings}</Text>
+
+        <View style={[styles.settingsGroup, { backgroundColor: theme.card }]}>
+          {/* Theme Toggle */}
+          <TouchableOpacity 
+            style={styles.settingItem}
+            onPress={handleThemeToggle}
+            activeOpacity={0.7}
+          >
+            <View style={styles.settingLeft}>
+              <View style={[styles.settingIcon, { backgroundColor: theme.isDark ? '#312e81' : '#fef3c7' }]}>
+                {theme.isDark ? <Moon size={18} color="#a78bfa" /> : <Sun size={18} color="#f59e0b" />}
+              </View>
+              <View>
+                <Text style={[styles.settingTitle, { color: theme.text }]}>{t.theme}</Text>
+                <Text style={[styles.settingSub, { color: theme.textSecondary }]}>
+                  {theme.isDark ? t.darkMode : t.lightMode}
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.settingAction, { backgroundColor: '#6366f1' }]}>
+              <Text style={styles.settingActionText}>{theme.isDark ? t.switchToLight : t.switchToDark}</Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Language Toggle */}
+          <TouchableOpacity 
+            style={styles.settingItem}
+            onPress={handleLanguageToggle}
+            activeOpacity={0.7}
+          >
+            <View style={styles.settingLeft}>
+              <View style={[styles.settingIcon, { backgroundColor: '#e0e7ff' }]}>
+                <Languages size={18} color="#6366f1" />
+              </View>
+              <View>
+                <Text style={[styles.settingTitle, { color: theme.text }]}>{t.language}</Text>
+                <Text style={[styles.settingSub, { color: theme.textSecondary }]}>
+                  {language === 'en' ? 'English' : 'العربية'}
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.settingAction, { backgroundColor: '#10b981' }]}>
+              <Text style={styles.settingActionText}>{language === 'en' ? 'العربية' : 'EN'}</Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Notifications Toggle */}
+          <View style={styles.settingItem}>
+            <View style={styles.settingLeft}>
+              <View style={[styles.settingIcon, { backgroundColor: '#fce7f3' }]}>
+                <Bell size={18} color="#ec4899" />
+              </View>
+              <View>
+                <Text style={[styles.settingTitle, { color: theme.text }]}>{t.notifications}</Text>
+                <Text style={[styles.settingSub, { color: theme.textSecondary }]}>
+                  {notificationSettings.enabled ? t.enabled : t.disabled}
+                </Text>
+              </View>
+            </View>
+            <Switch
+              value={notificationSettings.enabled}
+              onValueChange={(value) => updateNotificationSettings({ enabled: value })}
+              trackColor={{ false: theme.border, true: '#6366f1' }}
+              thumbColor="#fff"
+            />
+          </View>
         </View>
-        <View style={[styles.leaderboardContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          {getLeaderboard().slice(0, 5).map((userData, index) => {
+      </View>
+
+      {/* Leaderboard Section */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>{t.topContributors}</Text>
+        <View style={[styles.leaderboardCard, { backgroundColor: theme.card }]}>
+          {getLeaderboard().slice(0, 3).map((userData, index) => {
             const userInfo = users.find(u => u.id === userData.userId);
             if (!userInfo) return null;
+            const medals = ['🥇', '🥈', '🥉'];
+            const bgColors = ['#fef3c7', '#e5e7eb', '#fed7aa'];
             return (
-              <View key={userData.userId} style={[styles.leaderboardItem, isRTL && styles.rtl]}>
-                <View style={[styles.leaderboardRank, { backgroundColor: index === 0 ? '#FFD700' : index === 1 ? '#C0C0C0' : index === 2 ? '#CD7F32' : theme.backgroundSecondary }]}>
-                  <Text style={[styles.leaderboardRankText, { color: index < 3 ? '#000' : theme.text }]}>#{index + 1}</Text>
+              <View key={userData.userId} style={styles.leaderboardRow}>
+                <View style={[styles.leaderboardRank, { backgroundColor: bgColors[index] }]}>
+                  <Text style={styles.leaderboardMedal}>{medals[index]}</Text>
                 </View>
                 {userInfo.avatar ? (
                   <Image source={{ uri: userInfo.avatar }} style={styles.leaderboardAvatar} />
                 ) : (
-                  <View style={[styles.leaderboardAvatar, { backgroundColor: theme.primary }]}>
-                    <Text style={styles.leaderboardAvatarText}>{userInfo.name.charAt(0).toUpperCase()}</Text>
-                  </View>
+                  <LinearGradient 
+                    colors={getLevelColor(userInfo.level)} 
+                    style={styles.leaderboardAvatar}
+                  >
+                    <Text style={styles.leaderboardAvatarText}>{userInfo.name.charAt(0)}</Text>
+                  </LinearGradient>
                 )}
                 <View style={styles.leaderboardInfo}>
                   <Text style={[styles.leaderboardName, { color: theme.text }]}>{userInfo.name}</Text>
-                  <View style={[styles.leaderboardStats, isRTL && styles.rtl]}>
-                    <Award size={14} color={theme.accent} />
-                    <Text style={[styles.leaderboardReputation, { color: theme.textSecondary }]}>{userData.reputation} pts</Text>
-                    <Sparkles size={14} color={theme.secondary} style={{ marginLeft: 8 }} />
-                    <Text style={[styles.leaderboardBadges, { color: theme.textSecondary }]}>{userData.badges.length} badges</Text>
-                  </View>
+                  <Text style={[styles.leaderboardPoints, { color: theme.textSecondary }]}>
+                    {userData.reputation} {t.reputation.toLowerCase()}
+                  </Text>
                 </View>
+                <Text style={[styles.leaderboardScore, { color: theme.primary }]}>
+                  #{index + 1}
+                </Text>
               </View>
             );
           })}
         </View>
       </View>
 
-      {(user.bio || user.phone || user.company || user.location || user.website) && (
-        <View style={[styles.infoSection, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          {user.bio && (
-            <View style={styles.infoItem}>
-              <Text style={[styles.bioText, { color: theme.text }, isRTL && styles.rtlText]}>{user.bio}</Text>
-            </View>
-          )}
-          {user.location && (
-            <View style={[styles.infoItem, isRTL && styles.rtl]}>
-              <MapPin size={16} color={theme.textSecondary} />
-              <Text style={[styles.infoText, { color: theme.text }]}>{user.location}</Text>
-            </View>
-          )}
-          {user.company && (
-            <View style={[styles.infoItem, isRTL && styles.rtl]}>
-              <Briefcase size={16} color={theme.textSecondary} />
-              <Text style={[styles.infoText, { color: theme.text }]}>{user.company}</Text>
-            </View>
-          )}
-          {user.phone && (
-            <View style={[styles.infoItem, isRTL && styles.rtl]}>
-              <Phone size={16} color={theme.textSecondary} />
-              <Text style={[styles.infoText, { color: theme.text }]}>{user.phone}</Text>
-            </View>
-          )}
-          {user.website && (
-            <View style={[styles.infoItem, isRTL && styles.rtl]}>
-              <Globe size={16} color={theme.textSecondary} />
-              <Text style={[styles.infoText, { color: theme.primary }]}>{user.website}</Text>
-            </View>
-          )}
-        </View>
-      )}
-
+      {/* Logout Button */}
       <View style={styles.section}>
         <TouchableOpacity 
-          style={[styles.settingCard, { backgroundColor: theme.card, borderColor: theme.border }, isRTL && styles.rtl]}
-          onPress={handleThemeToggle}
+          style={styles.logoutBtn} 
+          onPress={handleLogout}
+          activeOpacity={0.8}
         >
-          <View style={[styles.settingLeft, isRTL && styles.rtl]}>
-            {theme.isDark ? (
-              <Moon size={24} color={theme.primary} fill={theme.primary} />
-            ) : (
-              <Sun size={24} color={theme.primary} />
-            )}
-            <View>
-              <Text style={[styles.settingTitle, { color: theme.text }, isRTL && styles.rtlText]}>Theme</Text>
-              <Text style={[styles.settingSubtitle, { color: theme.textSecondary }, isRTL && styles.rtlText]}>
-                {theme.isDark ? 'Dark Mode' : 'Light Mode'}
-              </Text>
-            </View>
-          </View>
-          <View style={[styles.settingBadge, { backgroundColor: theme.primary }]}>
-            <Text style={styles.settingBadgeText}>
-              {theme.isDark ? 'Light' : 'Dark'}
-            </Text>
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[styles.settingCard, { backgroundColor: theme.card, borderColor: theme.border }, isRTL && styles.rtl]}
-          onPress={handleLanguageToggle}
-        >
-          <View style={[styles.settingLeft, isRTL && styles.rtl]}>
-            <Languages size={24} color={theme.primary} />
-            <View>
-              <Text style={[styles.settingTitle, { color: theme.text }, isRTL && styles.rtlText]}>Language</Text>
-              <Text style={[styles.settingSubtitle, { color: theme.textSecondary }, isRTL && styles.rtlText]}>
-                {language === 'en' ? 'English' : 'العربية'}
-              </Text>
-            </View>
-          </View>
-          <View style={[styles.settingBadge, { backgroundColor: theme.primary }]}>
-            <Text style={styles.settingBadgeText}>
-              {language === 'en' ? 'العربية' : 'English'}
-            </Text>
-          </View>
+          <LogOut size={20} color="#ef4444" />
+          <Text style={styles.logoutText}>{t.logout}</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: theme.text }, isRTL && styles.rtlText]}>Notifications</Text>
-        
-        {permissionStatus === 'denied' && (
-          <TouchableOpacity
-            style={[styles.permissionCard, { backgroundColor: theme.card, borderColor: theme.accent, borderWidth: 2 }]}
-            onPress={async () => {
-              const granted = await requestPermissions();
-              if (!granted) {
-                Alert.alert('Permission Denied', 'Please enable notifications in your device settings to receive updates.');
-              }
-            }}
-          >
-            <Bell size={24} color={theme.accent} />
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={[styles.settingTitle, { color: theme.text }]}>Enable Notifications</Text>
-              <Text style={[styles.settingSubtitle, { color: theme.textSecondary }]}>
-                Get notified about answers and activity
-              </Text>
-            </View>
-          </TouchableOpacity>
-        )}
-
-        <View style={[styles.settingCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <View style={[styles.settingLeft, isRTL && styles.rtl]}>
-            <Bell size={24} color={theme.primary} />
-            <View>
-              <Text style={[styles.settingTitle, { color: theme.text }, isRTL && styles.rtlText]}>All Notifications</Text>
-              <Text style={[styles.settingSubtitle, { color: theme.textSecondary }, isRTL && styles.rtlText]}>
-                Enable or disable all notifications
-              </Text>
-            </View>
-          </View>
-          <Switch
-            value={notificationSettings.enabled}
-            onValueChange={(value) => updateNotificationSettings({ enabled: value })}
-            trackColor={{ false: theme.border, true: theme.primary }}
-            thumbColor="#fff"
-          />
-        </View>
-
-        {notificationSettings.enabled && (
-          <>
-            <View style={[styles.settingCard, { backgroundColor: theme.card, borderColor: theme.border, marginTop: 8 }]}>
-              <View style={[styles.settingLeft, isRTL && styles.rtl]}>
-                <MessageCircle size={20} color={theme.textSecondary} style={{ marginLeft: 32 }} />
-                <View>
-                  <Text style={[styles.settingTitle, { color: theme.text, fontSize: 15 }, isRTL && styles.rtlText]}>Answer Notifications</Text>
-                  <Text style={[styles.settingSubtitle, { color: theme.textSecondary, fontSize: 13 }, isRTL && styles.rtlText]}>
-                    When someone answers your question
-                  </Text>
-                </View>
-              </View>
-              <Switch
-                value={notificationSettings.answerNotifications}
-                onValueChange={(value) => updateNotificationSettings({ answerNotifications: value })}
-                trackColor={{ false: theme.border, true: theme.primary }}
-                thumbColor="#fff"
-              />
-            </View>
-
-            <View style={[styles.settingCard, { backgroundColor: theme.card, borderColor: theme.border, marginTop: 8 }]}>
-              <View style={[styles.settingLeft, isRTL && styles.rtl]}>
-                <Award size={20} color={theme.textSecondary} style={{ marginLeft: 32 }} />
-                <View>
-                  <Text style={[styles.settingTitle, { color: theme.text, fontSize: 15 }, isRTL && styles.rtlText]}>Best Answer Notifications</Text>
-                  <Text style={[styles.settingSubtitle, { color: theme.textSecondary, fontSize: 13 }, isRTL && styles.rtlText]}>
-                    When your answer is marked as best
-                  </Text>
-                </View>
-              </View>
-              <Switch
-                value={notificationSettings.bestAnswerNotifications}
-                onValueChange={(value) => updateNotificationSettings({ bestAnswerNotifications: value })}
-                trackColor={{ false: theme.border, true: theme.primary }}
-                thumbColor="#fff"
-              />
-            </View>
-          </>
-        )}
-      </View>
-
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: theme.text }, isRTL && styles.rtlText]}>{t.level} {t.categories}</Text>
-        <View style={[styles.levelInfo, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <View style={[styles.levelItem, isRTL && styles.rtl]}>
-            <View style={[styles.levelDot, { backgroundColor: theme.secondary }]} />
-            <View style={styles.levelDetails}>
-              <Text style={[styles.levelName, { color: theme.text }, isRTL && styles.rtlText]}>{t.beginner}</Text>
-              <Text style={[styles.levelDescription, { color: theme.textSecondary }, isRTL && styles.rtlText]}>0-100 {t.reputation}</Text>
-            </View>
-          </View>
-          <View style={[styles.levelItem, isRTL && styles.rtl]}>
-            <View style={[styles.levelDot, { backgroundColor: theme.primary }]} />
-            <View style={styles.levelDetails}>
-              <Text style={[styles.levelName, { color: theme.text }, isRTL && styles.rtlText]}>{t.intermediate}</Text>
-              <Text style={[styles.levelDescription, { color: theme.textSecondary }, isRTL && styles.rtlText]}>101-500 {t.reputation}</Text>
-            </View>
-          </View>
-          <View style={[styles.levelItem, isRTL && styles.rtl]}>
-            <View style={[styles.levelDot, { backgroundColor: theme.accent }]} />
-            <View style={styles.levelDetails}>
-              <Text style={[styles.levelName, { color: theme.text }, isRTL && styles.rtlText]}>{t.expert}</Text>
-              <Text style={[styles.levelDescription, { color: theme.textSecondary }, isRTL && styles.rtlText]}>500+ {t.reputation}</Text>
-            </View>
-          </View>
-        </View>
-      </View>
-
-      <TouchableOpacity style={[styles.logoutButton, { backgroundColor: theme.card, borderColor: theme.border }]} onPress={handleLogout}>
-        <LogOut size={20} color={theme.error} />
-        <Text style={[styles.logoutText, { color: theme.error }]}>{t.logout}</Text>
-      </TouchableOpacity>
-
+      {/* Footer */}
       <View style={styles.footer}>
-        <Text style={[styles.footerText, { color: theme.textSecondary }, isRTL && styles.rtlText]}>Labour Law Hub v1.0</Text>
-        <Text style={[styles.footerSubtext, { color: theme.textSecondary }, isRTL && styles.rtlText]}>
-          {user.role === 'admin' && t.adminRole}
+        <Text style={[styles.footerText, { color: theme.textSecondary }]}>
+          {settings.languageSettings?.[language]?.appName || settings.appName} v1.0
         </Text>
       </View>
 
@@ -544,13 +517,194 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    alignItems: 'center',
-    paddingVertical: 32,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
+  rtl: {
+    flexDirection: 'row-reverse',
   },
-  avatarWrapper: {
+  rtlText: {
+    textAlign: 'right',
+  },
+
+  // Guest Screen Styles
+  guestBgCircle1: {
+    position: 'absolute',
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    top: -100,
+    right: -80,
+  },
+  guestBgCircle2: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    bottom: 150,
+    left: -60,
+  },
+  guestScrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  guestLanguageToggle: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 40,
+    right: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  guestLanguageText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  guestIconSection: {
+    marginBottom: 28,
+  },
+  guestIconGradient: {
+    width: 110,
+    height: 110,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  guestTextSection: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  guestTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    marginBottom: 10,
+  },
+  guestSubtitle: {
+    fontSize: 15,
+    textAlign: 'center',
+    lineHeight: 22,
+    paddingHorizontal: 20,
+  },
+  guestFeatures: {
+    width: '100%',
+    gap: 12,
+    marginBottom: 32,
+  },
+  guestFeatureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    gap: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  guestFeatureIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  guestFeatureText: {
+    fontSize: 15,
+    fontWeight: '600',
+    flex: 1,
+  },
+  guestActions: {
+    width: '100%',
+    gap: 12,
+    marginBottom: 20,
+  },
+  guestPrimaryButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  guestPrimaryButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+    gap: 10,
+  },
+  guestPrimaryButtonText: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  guestSecondaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    gap: 10,
+  },
+  guestSecondaryButtonText: {
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  guestContinueButton: {
+    paddingVertical: 12,
+  },
+  guestContinueText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+
+  // Profile Header
+  profileHeader: {
+    height: 160,
+    position: 'relative',
+  },
+  headerPattern: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+  },
+  patternDot: {
+    position: 'absolute',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+
+  // Profile Card
+  profileCardContainer: {
+    paddingHorizontal: 16,
+    marginTop: -80,
+  },
+  profileCard: {
+    borderRadius: 24,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  avatarContainer: {
     position: 'relative',
     marginBottom: 16,
   },
@@ -561,399 +715,393 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  editAvatarButton: {
+  avatarText: {
+    fontSize: 36,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  editAvatarBtn: {
     position: 'absolute',
     bottom: 0,
     right: 0,
     width: 32,
     height: 32,
     borderRadius: 16,
+    backgroundColor: '#6366f1',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#6366f1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  onlineBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#10b981',
     borderWidth: 3,
+    borderColor: '#fff',
   },
-  avatarText: {
-    fontSize: 32,
-    fontWeight: '700' as const,
-    color: '#fff',
-  },
-  name: {
+  userName: {
     fontSize: 24,
-    fontWeight: '700' as const,
-    marginBottom: 4,
+    fontWeight: '800',
+    letterSpacing: -0.5,
   },
-  email: {
-    fontSize: 16,
+  userEmail: {
+    fontSize: 14,
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    gap: 8,
     marginBottom: 12,
   },
-  levelBadge: {
-    paddingHorizontal: 16,
+  levelPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 20,
-    marginBottom: 12,
+    gap: 6,
   },
-  editButton: {
+  levelPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#fff',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  adminPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6,
+    backgroundColor: '#eef2ff',
+  },
+  adminPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  memberSinceRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    borderWidth: 1,
+    marginBottom: 20,
   },
-  editButtonText: {
-    fontSize: 14,
-    fontWeight: '600' as const,
+  memberSinceText: {
+    fontSize: 13,
   },
-  levelText: {
-    fontSize: 12,
-    fontWeight: '700' as const,
-    color: '#fff',
-    textTransform: 'uppercase' as const,
-  },
-  statsSection: {
+  quickStats: {
     flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
+  },
+  quickStatItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  quickStatValue: {
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  quickStatLabel: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  quickStatDivider: {
+    width: 1,
+    height: 40,
+  },
+
+  // Stats Row
+  statsRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    gap: 12,
+    marginTop: 16,
+  },
+  statsCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 16,
+    borderRadius: 16,
+    gap: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  statsIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statsCardContent: {
+    flex: 1,
+  },
+  statsCardValue: {
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  statsCardLabel: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+
+  // Section
+  section: {
+    paddingHorizontal: 16,
+    marginTop: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+
+  // Action Row
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  actionRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
   },
-  statCard: {
-    flex: 1,
-    padding: 16,
+  actionIconBg: {
+    width: 44,
+    height: 44,
     borderRadius: 12,
     alignItems: 'center',
-    borderWidth: 1,
+    justifyContent: 'center',
   },
-  statNumber: {
-    fontSize: 20,
-    fontWeight: '700' as const,
-    marginTop: 8,
+  actionRowTitle: {
+    fontSize: 15,
+    fontWeight: '600',
   },
-  statLabel: {
-    fontSize: 11,
-    marginTop: 4,
-    textAlign: 'center',
+  actionRowSub: {
+    fontSize: 13,
+    marginTop: 2,
   },
-  infoSection: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
+
+  // Badges
+  badgesScroll: {
     gap: 12,
   },
-  infoItem: {
+  badgeCard: {
+    width: 110,
+    padding: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  badgeIconBg: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  badgeIcon: {
+    fontSize: 28,
+  },
+  badgeName: {
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  badgeRarity: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  badgeRarityText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+
+  // About Card
+  aboutCard: {
+    padding: 16,
+    borderRadius: 16,
+    gap: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  bioText: {
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  aboutRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
   },
-  bioText: {
+  aboutText: {
     fontSize: 14,
-    lineHeight: 20,
-  },
-  infoText: {
-    fontSize: 14,
-    flex: 1,
   },
 
-  section: {
-    padding: 16,
+  // Settings Group
+  settingsGroup: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
   },
-  settingCard: {
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
+  settingItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    justifyContent: 'space-between',
+    padding: 16,
   },
   settingLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  settingTitle: {
-    fontSize: 16,
-    fontWeight: '600' as const,
+  settingIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  settingSubtitle: {
-    fontSize: 14,
+  settingTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  settingSub: {
+    fontSize: 12,
     marginTop: 2,
   },
-  settingBadge: {
+  settingAction: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
   },
-  settingBadgeText: {
+  settingActionText: {
     color: '#fff',
-    fontSize: 14,
-    fontWeight: '600' as const,
+    fontSize: 12,
+    fontWeight: '600',
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700' as const,
-    marginBottom: 16,
-  },
-  levelInfo: {
-    borderRadius: 12,
+
+  // Leaderboard
+  leaderboardCard: {
     padding: 16,
-    borderWidth: 1,
+    borderRadius: 16,
     gap: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
   },
-  levelItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  levelDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 12,
-  },
-  levelDetails: {
-    flex: 1,
-  },
-  levelName: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-    marginBottom: 2,
-  },
-  levelDescription: {
-    fontSize: 14,
-  },
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 12,
-    gap: 8,
-    borderWidth: 1,
-  },
-  logoutText: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-    color: Colors.light.error,
-  },
-  footer: {
-    alignItems: 'center',
-    paddingVertical: 32,
-  },
-  footerText: {
-    fontSize: 14,
-  },
-  footerSubtext: {
-    fontSize: 12,
-    marginTop: 4,
-  },
-  rtl: {
-    flexDirection: 'row-reverse',
-  },
-  rtlText: {
-    textAlign: 'right',
-  },
-  scrollContent: {
-    flexGrow: 1,
-    padding: 24,
-    justifyContent: 'center',
-  },
-  iconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700' as const,
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-  },
-  form: {
-    width: '100%',
-    maxWidth: 400,
-    alignSelf: 'center',
-  },
-  tabs: {
-    flexDirection: 'row',
-    marginBottom: 24,
-    borderRadius: 12,
-    padding: 4,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderRadius: 8,
-  },
-  activeTab: {},
-  tabText: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-  },
-  activeTabText: {
-    color: '#fff',
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 12,
-    marginBottom: 16,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-  },
-  inputIcon: {
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    paddingVertical: 16,
-    fontSize: 16,
-  },
-  button: {
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600' as const,
-  },
-  errorText: {
-    color: Colors.light.error,
-    fontSize: 14,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  demoContainer: {
-    marginTop: 24,
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  demoText: {
-    fontSize: 14,
-    fontWeight: '600' as const,
-    marginBottom: 8,
-  },
-  demoEmail: {
-    fontSize: 13,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    marginBottom: 4,
-  },
-  permissionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  badgesContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  badgeItem: {
-    width: '47%',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 2,
-    alignItems: 'center',
-  },
-  badgeIcon: {
-    fontSize: 32,
-    marginBottom: 8,
-  },
-  badgeName: {
-    fontSize: 14,
-    fontWeight: '700' as const,
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  badgeDescription: {
-    fontSize: 12,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  badgeRarity: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  badgeRarityText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '700' as const,
-    textTransform: 'uppercase' as const,
-  },
-  leaderboardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 16,
-  },
-  leaderboardContainer: {
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    gap: 12,
-  },
-  leaderboardItem: {
+  leaderboardRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
   leaderboardRank: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  leaderboardRankText: {
-    fontSize: 14,
-    fontWeight: '700' as const,
+  leaderboardMedal: {
+    fontSize: 18,
   },
   leaderboardAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
   leaderboardAvatarText: {
-    fontSize: 18,
-    fontWeight: '700' as const,
+    fontSize: 16,
+    fontWeight: '700',
     color: '#fff',
   },
   leaderboardInfo: {
     flex: 1,
   },
   leaderboardName: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-    marginBottom: 4,
+    fontSize: 15,
+    fontWeight: '600',
   },
-  leaderboardStats: {
+  leaderboardPoints: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  leaderboardScore: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+
+  // Logout
+  logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 16,
+    gap: 8,
+    backgroundColor: '#fef2f2',
   },
-  leaderboardReputation: {
-    fontSize: 13,
+  logoutText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ef4444',
   },
-  leaderboardBadges: {
-    fontSize: 13,
+
+  // Footer
+  footer: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    paddingBottom: 120,
+  },
+  footerText: {
+    fontSize: 14,
   },
 });

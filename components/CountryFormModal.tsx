@@ -22,6 +22,46 @@ interface CountryFormModalProps {
   country?: Country;
 }
 
+// Common country flags for quick selection
+const COMMON_FLAGS = [
+  { code: 'SA', flag: '🇸🇦' },
+  { code: 'AE', flag: '🇦🇪' },
+  { code: 'EG', flag: '🇪🇬' },
+  { code: 'QA', flag: '🇶🇦' },
+  { code: 'KW', flag: '🇰🇼' },
+  { code: 'OM', flag: '🇴🇲' },
+  { code: 'BH', flag: '🇧🇭' },
+  { code: 'JO', flag: '🇯🇴' },
+  { code: 'LB', flag: '🇱🇧' },
+  { code: 'US', flag: '🇺🇸' },
+  { code: 'GB', flag: '🇬🇧' },
+  { code: 'CA', flag: '🇨🇦' },
+  { code: 'DE', flag: '🇩🇪' },
+  { code: 'FR', flag: '🇫🇷' },
+  { code: 'AU', flag: '🇦🇺' },
+  { code: 'JP', flag: '🇯🇵' },
+  { code: 'IN', flag: '🇮🇳' },
+  { code: 'CN', flag: '🇨🇳' },
+  { code: 'BR', flag: '🇧🇷' },
+  { code: 'IT', flag: '🇮🇹' },
+  { code: 'ES', flag: '🇪🇸' },
+  { code: 'NL', flag: '🇳🇱' },
+  { code: 'KR', flag: '🇰🇷' },
+  { code: 'MX', flag: '🇲🇽' },
+  { code: 'RU', flag: '🇷🇺' },
+  { code: 'ZA', flag: '🇿🇦' },
+  { code: 'SE', flag: '🇸🇪' },
+  { code: 'CH', flag: '🇨🇭' },
+  { code: 'PL', flag: '🇵🇱' },
+  { code: 'TR', flag: '🇹🇷' },
+  { code: 'SG', flag: '🇸🇬' },
+  { code: 'MY', flag: '🇲🇾' },
+  { code: 'TH', flag: '🇹🇭' },
+  { code: 'PH', flag: '🇵🇭' },
+  { code: 'ID', flag: '🇮🇩' },
+  { code: 'PK', flag: '🇵🇰' },
+];
+
 export default function CountryFormModal({ visible, onClose, onSave, country }: CountryFormModalProps) {
   const { t, isRTL } = useLanguage();
   const [nameEn, setNameEn] = useState('');
@@ -29,6 +69,7 @@ export default function CountryFormModal({ visible, onClose, onSave, country }: 
   const [code, setCode] = useState('');
   const [flag, setFlag] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showFlagPicker, setShowFlagPicker] = useState(false);
 
   useEffect(() => {
     if (country) {
@@ -42,6 +83,7 @@ export default function CountryFormModal({ visible, onClose, onSave, country }: 
       setCode('');
       setFlag('');
     }
+    setShowFlagPicker(false);
   }, [country, visible]);
 
   const handleSave = async () => {
@@ -56,7 +98,7 @@ export default function CountryFormModal({ visible, onClose, onSave, country }: 
           ar: nameAr || nameEn,
         },
         code, 
-        flag 
+        flag,
       });
       onClose();
     } catch (error) {
@@ -118,7 +160,7 @@ export default function CountryFormModal({ visible, onClose, onSave, country }: 
                 style={[styles.input, isRTL && styles.rtl]}
                 value={code}
                 onChangeText={setCode}
-                placeholder="US, GB, etc."
+                placeholder="US, GB, SA, etc."
                 placeholderTextColor={Colors.light.textSecondary}
                 autoCapitalize="characters"
                 maxLength={2}
@@ -128,13 +170,55 @@ export default function CountryFormModal({ visible, onClose, onSave, country }: 
 
             <View style={styles.formGroup}>
               <Text style={[styles.label, isRTL && styles.rtl]}>{t.countryFlag}</Text>
+              
+              {/* Selected Flag Display */}
+              <TouchableOpacity 
+                style={styles.flagSelector}
+                onPress={() => setShowFlagPicker(!showFlagPicker)}
+              >
+                <Text style={styles.selectedFlag}>{flag || '🏳️'}</Text>
+                <Text style={styles.selectFlagText}>
+                  {flag ? 'Change Flag' : 'Select Flag'}
+                </Text>
+              </TouchableOpacity>
+              
+              {/* Flag Picker Grid */}
+              {showFlagPicker && (
+                <View style={styles.flagPickerContainer}>
+                  <ScrollView 
+                    horizontal 
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.flagPickerScroll}
+                  >
+                    {COMMON_FLAGS.map((item) => (
+                      <TouchableOpacity
+                        key={item.code}
+                        style={[
+                          styles.flagOption,
+                          flag === item.flag && styles.flagOptionSelected
+                        ]}
+                        onPress={() => {
+                          setFlag(item.flag);
+                          if (!code) setCode(item.code);
+                          setShowFlagPicker(false);
+                        }}
+                      >
+                        <Text style={styles.flagEmoji}>{item.flag}</Text>
+                        <Text style={styles.flagCode}>{item.code}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+              
+              {/* Manual Flag Input */}
               <TextInput
-                style={[styles.input, isRTL && styles.rtl]}
+                style={[styles.input, styles.flagInput]}
                 value={flag}
                 onChangeText={setFlag}
-                placeholder="🇺🇸"
+                placeholder="Or paste flag emoji here 🏳️"
                 placeholderTextColor={Colors.light.textSecondary}
-                textAlign={isRTL ? 'right' : 'left'}
+                textAlign="center"
               />
             </View>
           </ScrollView>
@@ -244,5 +328,58 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.5,
+  },
+  flagSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.light.backgroundSecondary,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    gap: 12,
+  },
+  selectedFlag: {
+    fontSize: 32,
+  },
+  selectFlagText: {
+    fontSize: 14,
+    color: Colors.light.primary,
+    fontWeight: '600',
+  },
+  flagPickerContainer: {
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  flagPickerScroll: {
+    gap: 8,
+    paddingVertical: 4,
+  },
+  flagOption: {
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 10,
+    backgroundColor: Colors.light.backgroundSecondary,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    minWidth: 56,
+  },
+  flagOptionSelected: {
+    borderColor: Colors.light.primary,
+    backgroundColor: '#eef2ff',
+  },
+  flagEmoji: {
+    fontSize: 28,
+  },
+  flagCode: {
+    fontSize: 10,
+    color: Colors.light.textSecondary,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  flagInput: {
+    marginTop: 12,
+    textAlign: 'center',
+    fontSize: 20,
   },
 });

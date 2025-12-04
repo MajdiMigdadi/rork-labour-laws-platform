@@ -11,6 +11,13 @@ import { FavoritesProvider } from '@/contexts/FavoritesContext';
 import { NotificationsProvider } from '@/contexts/NotificationsContext';
 import { ReputationProvider } from '@/contexts/ReputationContext';
 import { ContactProvider } from '@/contexts/ContactContext';
+import { ReadingHistoryProvider } from '@/contexts/ReadingHistoryContext';
+import { FontSizeProvider } from '@/contexts/FontSizeContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
+import { AchievementsProvider } from '@/contexts/AchievementsContext';
+import { BookmarksProvider } from '@/contexts/BookmarksContext';
+import FloatingActionButton from '@/components/FloatingActionButton';
+import AchievementPopup from '@/components/AchievementPopup';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -18,13 +25,19 @@ const queryClient = new QueryClient();
 
 function RootLayoutNav() {
   return (
-    <Stack screenOptions={{ 
-      headerBackTitle: 'Back',
-    }}>
-      <Stack.Screen name="landing" options={{ headerShown: false }} />
-      <Stack.Screen name="auth" options={{ headerShown: false }} />
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-    </Stack>
+    <>
+      <Stack screenOptions={{ 
+        headerBackTitle: 'Back',
+      }}>
+        <Stack.Screen name="landing" options={{ headerShown: false }} />
+        <Stack.Screen name="auth" options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      </Stack>
+      <FloatingActionButton />
+      <AchievementPopup />
+    </>
   );
 }
 
@@ -42,11 +55,21 @@ export default function RootLayout() {
               <ReputationProvider>
                 <FavoritesProvider>
                   <NotificationsProvider>
-                    <ContactProvider>
-                      <GestureHandlerRootView style={{ flex: 1 }}>
-                        <RootLayoutNav />
-                      </GestureHandlerRootView>
-                    </ContactProvider>
+                    <ReadingHistoryProvider>
+                      <FontSizeProvider>
+                        <ThemeProvider>
+                          <AchievementsProvider>
+                            <BookmarksProvider>
+                              <ContactProvider>
+                                <GestureHandlerRootView style={{ flex: 1 }}>
+                                  <RootLayoutNav />
+                                </GestureHandlerRootView>
+                              </ContactProvider>
+                            </BookmarksProvider>
+                          </AchievementsProvider>
+                        </ThemeProvider>
+                      </FontSizeProvider>
+                    </ReadingHistoryProvider>
                   </NotificationsProvider>
                 </FavoritesProvider>
               </ReputationProvider>

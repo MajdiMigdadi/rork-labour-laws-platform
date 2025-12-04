@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,42 +8,91 @@ import {
   TextInput,
   ScrollView,
   Image,
+  Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   MessageCircle,
-  ChevronRight,
   ThumbsUp,
   MessageSquare,
   CheckCircle,
   TrendingUp,
   Clock,
-  Trophy,
   Bookmark,
   Search,
   X,
+  Sparkles,
+  HelpCircle,
+  Zap,
+  Plus,
+  ChevronRight,
 } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import Colors from '@/constants/colors';
-import { mockUsers } from '@/mocks/data';
 import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/hooks/useTheme';
 import { useFavorites } from '@/contexts/FavoritesContext';
+import FlagDisplay from '@/components/FlagDisplay';
+import { SkeletonQuestionsList } from '@/components/Skeleton';
+import SearchWithHistory from '@/components/SearchWithHistory';
+import HapticRefreshControl from '@/components/HapticRefreshControl';
 
 type SortType = 'recent' | 'popular' | 'unanswered';
 
 export default function QAScreen() {
   const router = useRouter();
-  const { questions, countries, categories } = useData();
+  const { questions, countries, categories, isLoading } = useData();
   const [sortBy, setSortBy] = useState<SortType>('recent');
-  const { user } = useAuth();
-  const { isRTL } = useLanguage();
+  const { user, users } = useAuth();
+  const { isRTL, t, getTranslatedName } = useLanguage();
   const theme = useTheme();
   const { toggleQuestionFavorite, isQuestionFavorited } = useFavorites();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  
+  // Animations
+  const headerAnim = useRef(new Animated.Value(0)).current;
+  const fabAnim = useRef(new Animated.Value(0)).current;
+  const fabPulse = useRef(new Animated.Value(1)).current;
+  
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(headerAnim, {
+        toValue: 1,
+        tension: 50,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+      Animated.spring(fabAnim, {
+        toValue: 1,
+        tension: 50,
+        friction: 8,
+        delay: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    
+    // Pulse animation for FAB
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(fabPulse, {
+          toValue: 1.08,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fabPulse, {
+          toValue: 1,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
 
   const filteredAndSortedQuestions = useMemo(() => {
     let filtered = questions.filter(question => {
@@ -66,35 +115,33 @@ export default function QAScreen() {
     });
   }, [questions, searchQuery, selectedCountry, selectedCategory, sortBy]);
 
+  // Stats
+  const totalQuestions = questions.length;
+  const resolvedQuestions = questions.filter(q => q.isResolved).length;
+  const unansweredQuestions = questions.filter(q => q.answerCount === 0).length;
+
   const getUser = (userId: string) => {
-    return mockUsers.find(u => u.id === userId);
+    return users.find(u => u.id === userId);
   };
 
   const getCountry = (countryId: string) => {
     return countries.find(c => c.id === countryId);
   };
 
+  const getCategory = (categoryId: string) => {
+    return categories.find(c => c.id === categoryId);
+  };
+
   const getLevelColor = (level: string) => {
     switch (level) {
       case 'beginner':
-        return theme.secondary;
+        return '#94a3b8';
       case 'intermediate':
-        return theme.primary;
+        return '#3b82f6';
       case 'expert':
-        return theme.accent;
+        return '#f59e0b';
       default:
-        return theme.secondary;
-    }
-  };
-
-  const getLevelIcon = (level: string) => {
-    switch (level) {
-      case 'expert':
-        return Trophy;
-      case 'intermediate':
-        return TrendingUp;
-      default:
-        return Clock;
+        return '#94a3b8';
     }
   };
 
@@ -106,239 +153,347 @@ export default function QAScreen() {
 
   const hasActiveFilters = searchQuery !== '' || selectedCountry || selectedCategory;
 
+  // Pull-to-refresh handler
+  const onRefresh = async () => {
+    setRefreshing(true);
+    // Simulate data refresh (in real app, this would refetch from API)
+    await new Promise(resolve => setTimeout(resolve, 1200));
+    setRefreshing(false);
+  };
+
+  const renderQuestionItem = ({ item, index }: { item: typeof questions[0]; index: number }) => {
+    const questionUser = getUser(item.userId);
+    const userName = questionUser?.name || 'Anonymous';
+    const userLevel = questionUser?.level || 'beginner';
+    const country = getCountry(item.countryId);
+    const category = getCategory(item.categoryId);
+    
+    const cardAnim = new Animated.Value(0);
+    Animated.spring(cardAnim, {
+      toValue: 1,
+      tension: 50,
+      friction: 8,
+      delay: index * 40,
+      useNativeDriver: true,
+    }).start();
+
+    return (
+      <Animated.View
+        style={[
+          styles.questionItem,
+          {
+            opacity: cardAnim,
+            transform: [
+              { translateX: cardAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [-20, 0],
+              })},
+            ],
+          },
+        ]}
+      >
+        <TouchableOpacity
+          style={[styles.questionItemInner, { backgroundColor: theme.card }]}
+          activeOpacity={0.8}
+          onPress={() => router.push(`/(tabs)/question-detail?id=${item.id}`)}
+        >
+          {/* Left: Status line */}
+          <View style={[
+            styles.statusLine,
+            { backgroundColor: item.isResolved ? '#22c55e' : '#6366f1' }
+          ]} />
+          
+          {/* Avatar */}
+          <View style={styles.itemAvatar}>
+            {questionUser?.avatar ? (
+              <Image source={{ uri: questionUser.avatar }} style={styles.avatarImg} />
+            ) : (
+              <LinearGradient
+                colors={[getLevelColor(userLevel), getLevelColor(userLevel) + 'bb']}
+                style={styles.avatarImg}
+              >
+                <Text style={styles.avatarText}>{userName.charAt(0).toUpperCase()}</Text>
+              </LinearGradient>
+            )}
+          </View>
+          
+          {/* Content */}
+          <View style={styles.itemContent}>
+            <View style={styles.itemMeta}>
+              <FlagDisplay flag={country?.flag || ''} size="small" />
+              <Text style={[styles.itemCategory, { color: theme.primary }]}>{category ? getTranslatedName(category) : ''}</Text>
+              <Text style={[styles.itemDot, { color: theme.textSecondary }]}>•</Text>
+              <Text style={[styles.itemDate, { color: theme.textSecondary }]}>
+                {new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </Text>
+            </View>
+            <Text style={[styles.itemTitle, { color: theme.text }]} numberOfLines={1}>
+              {item.title}
+            </Text>
+            <View style={styles.itemStats}>
+              <View style={styles.itemStat}>
+                <ThumbsUp size={12} color="#6366f1" />
+                <Text style={styles.itemStatText}>{item.votes}</Text>
+              </View>
+              <View style={styles.itemStat}>
+                <MessageSquare size={12} color="#06b6d4" />
+                <Text style={[styles.itemStatText, { color: '#06b6d4' }]}>{item.answerCount}</Text>
+              </View>
+              {item.isResolved && (
+                <View style={styles.itemResolved}>
+                  <CheckCircle size={12} color="#22c55e" />
+                  <Text style={styles.itemResolvedText}>{t.solved}</Text>
+                </View>
+              )}
+            </View>
+          </View>
+          
+          {/* Right actions */}
+          <View style={styles.itemActions}>
+            <TouchableOpacity
+              style={[
+                styles.bookmarkBtn,
+                isQuestionFavorited(item.id) && styles.bookmarkBtnActive
+              ]}
+              onPress={() => toggleQuestionFavorite(item.id)}
+              activeOpacity={0.7}
+            >
+              <Bookmark
+                size={16}
+                color={isQuestionFavorited(item.id) ? '#6366f1' : theme.textSecondary}
+                fill={isQuestionFavorited(item.id) ? '#6366f1' : 'transparent'}
+              />
+            </TouchableOpacity>
+            <ChevronRight size={18} color={theme.textSecondary} />
+          </View>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
+
+  // Show skeleton while loading
+  if (isLoading) {
+    return <SkeletonQuestionsList />;
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundSecondary }]}>
-      <View style={[styles.searchSection, { backgroundColor: theme.background, borderBottomColor: theme.border }]}>
-        <View style={[styles.searchBar, { backgroundColor: theme.card, borderColor: theme.border }, isRTL && styles.rtl]}>
-          <Search size={18} color={theme.textSecondary} />
-          <TextInput
-            style={[styles.searchInput, { color: theme.text }, isRTL && styles.rtlText]}
-            placeholder="Search..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholderTextColor={theme.textSecondary}
-            textAlign={isRTL ? 'right' : 'left'}
-          />
-          {searchQuery !== '' && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <X size={16} color={theme.textSecondary} />
-            </TouchableOpacity>
-          )}
-        </View>
+      {/* Stats Header */}
+      <Animated.View 
+        style={[
+          styles.statsHeader,
+          { backgroundColor: theme.background },
+          {
+            opacity: headerAnim,
+            transform: [{ translateY: headerAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [-15, 0],
+            })}],
+          },
+        ]}
+      >
+        <LinearGradient
+          colors={['#6366f1', '#8b5cf6']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.statsCard}
+        >
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <View style={styles.statIconBg}>
+                <HelpCircle size={14} color="#6366f1" />
+              </View>
+              <View style={styles.statTextCol}>
+                <Text style={styles.statNumber}>{totalQuestions}</Text>
+                <Text style={styles.statLabel}>{t.total}</Text>
+              </View>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <View style={[styles.statIconBg, { backgroundColor: '#dcfce7' }]}>
+                <CheckCircle size={14} color="#22c55e" />
+              </View>
+              <View style={styles.statTextCol}>
+                <Text style={styles.statNumber}>{resolvedQuestions}</Text>
+                <Text style={styles.statLabel}>{t.solved}</Text>
+              </View>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <View style={[styles.statIconBg, { backgroundColor: '#fef3c7' }]}>
+                <Zap size={14} color="#f59e0b" />
+              </View>
+              <View style={styles.statTextCol}>
+                <Text style={styles.statNumber}>{unansweredQuestions}</Text>
+                <Text style={styles.statLabel}>{t.open}</Text>
+              </View>
+            </View>
+          </View>
+        </LinearGradient>
+      </Animated.View>
+
+      {/* Search */}
+      <View style={[styles.searchSection, { backgroundColor: theme.background }]}>
+        <SearchWithHistory
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder={t.searchQuestions}
+          storageKey="questions"
+          suggestions={questions.map(q => q.title)}
+          popularSearches={['Overtime Pay', 'Contract', 'Resignation', 'Sick Leave', 'Salary Delay', 'Benefits']}
+          onFocus={() => setIsSearchFocused(true)}
+          onBlur={() => setIsSearchFocused(false)}
+        />
       </View>
 
-      <View style={[styles.filtersSection, { backgroundColor: theme.background, borderBottomColor: theme.border }]}>
-        {hasActiveFilters && (
-          <View style={styles.clearFilterRow}>
-            <TouchableOpacity
-              style={[styles.filterChip, { backgroundColor: theme.error, borderColor: theme.error }]}
-              onPress={clearFilters}
-            >
-              <X size={14} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        )}
-        
+      {/* Filter Row 1: Countries */}
+      <View style={[styles.filterSection, { backgroundColor: theme.background }]}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filtersContent}
+          contentContainerStyle={styles.filterRow}
         >
+          {hasActiveFilters && (
+            <TouchableOpacity style={styles.clearChip} onPress={clearFilters}>
+              <X size={12} color="#fff" />
+            </TouchableOpacity>
+          )}
           {countries.map(country => (
             <TouchableOpacity
               key={country.id}
               style={[
-                styles.filterChip,
-                { backgroundColor: theme.card, borderColor: theme.border },
-                selectedCountry === country.id && { backgroundColor: theme.primary, borderColor: theme.primary },
+                styles.countryChip,
+                { backgroundColor: theme.card, borderColor: selectedCountry === country.id ? '#6366f1' : theme.border },
+                selectedCountry === country.id && styles.countryChipActive,
               ]}
               onPress={() => setSelectedCountry(country.id === selectedCountry ? null : country.id)}
             >
-              <Text style={styles.filterChipEmoji}>{country.flag}</Text>
+              <FlagDisplay flag={country.flag} size="small" />
             </TouchableOpacity>
           ))}
         </ScrollView>
+      </View>
 
+      {/* Filter Row 2: Categories */}
+      <View style={[styles.filterSection, { backgroundColor: theme.background, paddingTop: 0 }]}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filtersContent}
-          style={styles.tagsRow}
+          contentContainerStyle={styles.filterRow}
         >
           {categories.map(category => (
             <TouchableOpacity
               key={category.id}
               style={[
-                styles.filterChip,
-                { backgroundColor: theme.card, borderColor: theme.border },
-                selectedCategory === category.id && {
-                  backgroundColor: theme.secondary,
-                  borderColor: theme.secondary,
-                },
+                styles.categoryChip,
+                { backgroundColor: theme.card, borderColor: selectedCategory === category.id ? '#8b5cf6' : theme.border },
+                selectedCategory === category.id && styles.categoryChipActive,
               ]}
               onPress={() => setSelectedCategory(category.id === selectedCategory ? null : category.id)}
             >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  { color: theme.text },
-                  selectedCategory === category.id && styles.filterChipTextActive,
-                ]}
-              >
-                {category.name}
+              <Text style={[
+                styles.categoryText,
+                { color: selectedCategory === category.id ? '#fff' : theme.text },
+              ]}>
+                {getTranslatedName(category)}
               </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
       </View>
 
-      <View style={[styles.sortHeader, { backgroundColor: theme.background, borderBottomColor: theme.border }]}>
-        <View style={styles.sortContainer}>
-          <TouchableOpacity
-            style={[styles.sortButton, { backgroundColor: theme.card, borderColor: theme.border }, sortBy === 'recent' && { backgroundColor: theme.primary, borderColor: theme.primary }]}
-            onPress={() => setSortBy('recent')}
-          >
-            <Clock size={14} color={sortBy === 'recent' ? '#fff' : theme.text} />
-            <Text style={[styles.sortButtonText, { color: theme.text }, sortBy === 'recent' && styles.sortButtonTextActive]}>
-              Recent
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.sortButton, { backgroundColor: theme.card, borderColor: theme.border }, sortBy === 'popular' && { backgroundColor: theme.primary, borderColor: theme.primary }]}
-            onPress={() => setSortBy('popular')}
-          >
-            <TrendingUp size={14} color={sortBy === 'popular' ? '#fff' : theme.text} />
-            <Text style={[styles.sortButtonText, { color: theme.text }, sortBy === 'popular' && styles.sortButtonTextActive]}>
-              Popular
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.sortButton, { backgroundColor: theme.card, borderColor: theme.border }, sortBy === 'unanswered' && { backgroundColor: theme.primary, borderColor: theme.primary }]}
-            onPress={() => setSortBy('unanswered')}
-          >
-            <MessageSquare size={14} color={sortBy === 'unanswered' ? '#fff' : theme.text} />
-            <Text style={[styles.sortButtonText, { color: theme.text }, sortBy === 'unanswered' && styles.sortButtonTextActive]}>
-              Unanswered
-            </Text>
-          </TouchableOpacity>
+      {/* Sort Bar */}
+      <View style={[styles.sortBar, { backgroundColor: theme.background, borderBottomColor: theme.border }]}>
+        <View style={styles.sortButtons}>
+          {[
+            { key: 'recent', icon: Clock, label: t.recent },
+            { key: 'popular', icon: TrendingUp, label: t.popular },
+            { key: 'unanswered', icon: MessageSquare, label: t.unanswered },
+          ].map((item) => (
+            <TouchableOpacity
+              key={item.key}
+              style={[
+                styles.sortButton,
+                sortBy === item.key && styles.sortButtonActive,
+              ]}
+              onPress={() => setSortBy(item.key as SortType)}
+            >
+              <item.icon size={12} color={sortBy === item.key ? '#fff' : theme.textSecondary} />
+              <Text style={[
+                styles.sortButtonText,
+                { color: sortBy === item.key ? '#fff' : theme.textSecondary }
+              ]}>
+                {item.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
-        <Text style={[styles.resultsCount, { color: theme.textSecondary }, isRTL && styles.rtlText]}>
+        <Text style={[styles.resultsCount, { color: theme.textSecondary }]}>
           {filteredAndSortedQuestions.length}
         </Text>
       </View>
 
+      {/* Questions List */}
       <FlatList
         data={filteredAndSortedQuestions}
         keyExtractor={item => item.id}
-        contentContainerStyle={styles.questionsList}
-        renderItem={({ item }) => {
-          const user = getUser(item.userId);
-          const userName = user?.name || 'Anonymous';
-          const userLevel = user?.level || 'beginner';
-          const country = getCountry(item.countryId);
-          const LevelIcon = getLevelIcon(userLevel);
-
-          return (
-            <View style={[styles.questionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              <TouchableOpacity
-                style={styles.questionCardContent}
-                activeOpacity={0.7}
-                onPress={() => router.push(`/(tabs)/question-detail?id=${item.id}`)}
-              >
-              <View style={[styles.questionHeader, isRTL && styles.rtl]}>
-                <View style={[styles.userInfo, isRTL && styles.rtl]}>
-                  {user?.avatar ? (
-                    <Image
-                      source={{ uri: user.avatar }}
-                      style={styles.userAvatar}
-                    />
-                  ) : (
-                    <View
-                      style={[
-                        styles.userAvatar,
-                        { backgroundColor: getLevelColor(userLevel) },
-                      ]}
-                    >
-                      <Text style={styles.userAvatarText}>
-                        {userName.charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
-                  )}
-                  <View style={[styles.userDetails, isRTL && styles.rtl]}>
-                    <View style={[styles.userNameRow, isRTL && styles.rtl]}>
-                      <Text style={[styles.userName, { color: theme.text }, isRTL && styles.rtlText]}>{userName}</Text>
-                      <View style={[styles.levelBadge, { backgroundColor: getLevelColor(userLevel) }]}>
-                        <LevelIcon size={10} color="#fff" />
-                      </View>
-                    </View>
-                    <View style={[styles.countryDateRow, isRTL && styles.rtl]}>
-                      <Text style={styles.countryFlag}>{country?.flag}</Text>
-                      <Text style={[styles.countryCode, { color: theme.textSecondary }]}>{country?.code}</Text>
-                      <Text style={[styles.dot, { color: theme.textSecondary }]}>•</Text>
-                      <Text style={[styles.questionTime, { color: theme.textSecondary }, isRTL && styles.rtlText]}>
-                        {new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-              <Text style={[styles.questionTitle, { color: theme.text }, isRTL && styles.rtlText]} numberOfLines={2}>{item.title}</Text>
-
-                <View style={[styles.questionFooter, isRTL && styles.rtl]}>
-                  <View style={[styles.statsRow, isRTL && styles.rtl]}>
-                    <View style={[styles.stat, isRTL && styles.rtl]}>
-                      <ThumbsUp size={16} color={theme.textSecondary} />
-                      <Text style={[styles.statText, { color: theme.textSecondary }]}>{item.votes}</Text>
-                    </View>
-                    <View style={[styles.stat, isRTL && styles.rtl]}>
-                      <MessageSquare size={16} color={theme.textSecondary} />
-                      <Text style={[styles.statText, { color: theme.textSecondary }]}>{item.answerCount}</Text>
-                    </View>
-                    {item.isResolved && (
-                      <View style={[styles.resolvedBadge, { backgroundColor: `${theme.success}15` }, isRTL && styles.rtl]}>
-                        <CheckCircle size={14} color={theme.success} />
-                        <Text style={[styles.resolvedText, { color: theme.success }]}>Resolved</Text>
-                      </View>
-                    )}
-                  </View>
-                  <ChevronRight size={20} color={theme.textSecondary} style={isRTL ? { transform: [{ rotate: '180deg' }] } : {}} />
-                </View>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.bookmarkButton}
-                onPress={() => toggleQuestionFavorite(item.id)}
-                activeOpacity={0.7}
-              >
-                <Bookmark
-                  size={22}
-                  color={isQuestionFavorited(item.id) ? theme.primary : theme.textSecondary}
-                  fill={isQuestionFavorited(item.id) ? theme.primary : 'transparent'}
-                />
-              </TouchableOpacity>
-            </View>
-          );
-        }}
+        contentContainerStyle={styles.listContent}
+        renderItem={renderQuestionItem}
+        refreshControl={
+          <HapticRefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+          />
+        }
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <MessageCircle size={48} color={theme.textSecondary} />
-            <Text style={[styles.emptyStateText, { color: theme.text }, isRTL && styles.rtlText]}>No questions found</Text>
-            <Text style={[styles.emptyStateSubtext, { color: theme.textSecondary }, isRTL && styles.rtlText]}>
-              {hasActiveFilters ? 'Try adjusting your filters' : 'Be the first to ask a question!'}
+            <LinearGradient colors={['#eef2ff', '#e0e7ff']} style={styles.emptyIconBg}>
+              <MessageCircle size={36} color="#6366f1" />
+            </LinearGradient>
+            <Text style={[styles.emptyStateText, { color: theme.text }]}>{t.noQuestionsFound}</Text>
+            <Text style={[styles.emptyStateSubtext, { color: theme.textSecondary }]}>
+              {hasActiveFilters ? t.tryAdjustingFilters : t.beFirstToAsk}
             </Text>
+            {!hasActiveFilters && user && (
+              <TouchableOpacity style={styles.emptyAskButton} onPress={() => router.push('/(tabs)/ask-question')}>
+                <LinearGradient colors={['#6366f1', '#8b5cf6']} style={styles.emptyAskButtonGradient}>
+                  <Sparkles size={16} color="#fff" />
+                  <Text style={styles.emptyAskButtonText}>{t.askQuestion}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
           </View>
         }
       />
 
+      {/* FAB */}
       {user && (
-        <TouchableOpacity
-          style={[styles.askButton, { backgroundColor: theme.primary }]}
-          activeOpacity={0.9}
-          onPress={() => router.push('/(tabs)/ask-question')}
+        <Animated.View
+          style={[
+            styles.fabContainer,
+            {
+              opacity: fabAnim,
+              transform: [
+                { scale: Animated.multiply(fabAnim, fabPulse) },
+                { translateY: fabAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [40, 0],
+                })},
+              ],
+            },
+          ]}
         >
-          <MessageCircle size={24} color="#fff" />
-          <Text style={styles.askButtonText}>Ask Question</Text>
-        </TouchableOpacity>
+          <TouchableOpacity activeOpacity={0.9} onPress={() => router.push('/(tabs)/ask-question')}>
+            <LinearGradient
+              colors={['#6366f1', '#8b5cf6']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.fab}
+            >
+              <Plus size={24} color="#fff" strokeWidth={2.5} />
+            </LinearGradient>
+          </TouchableOpacity>
+        </Animated.View>
       )}
     </View>
   );
@@ -347,277 +502,372 @@ export default function QAScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.backgroundSecondary,
   },
+  
+  // Stats Header
+  statsHeader: {
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 6,
+  },
+  statsCard: {
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    shadowColor: '#6366f1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    gap: 8,
+  },
+  statIconBg: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: '#eef2ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statTextCol: {
+    alignItems: 'flex-start',
+  },
+  statNumber: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#fff',
+    lineHeight: 18,
+  },
+  statLabel: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.75)',
+    fontWeight: '500',
+  },
+  statDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  
+  // Search Section
   searchSection: {
-    backgroundColor: Colors.light.background,
-    paddingTop: 12,
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 4,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.light.backgroundSecondary,
-    borderRadius: 12,
+    borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
+    paddingVertical: 10,
+    borderWidth: 1.5,
+  },
+  searchBarFocused: {
+    shadowColor: '#6366f1',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   searchInput: {
     flex: 1,
     marginLeft: 8,
-    fontSize: 15,
-    color: Colors.light.text,
+    fontSize: 14,
+    paddingVertical: 0,
   },
-  filtersSection: {
-    backgroundColor: Colors.light.background,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
-  },
-  clearFilterRow: {
-    paddingHorizontal: 16,
-    paddingBottom: 6,
-  },
-  filtersContent: {
-    paddingHorizontal: 16,
-    gap: 6,
-  },
-  tagsRow: {
-    marginTop: 6,
-  },
-  filterChip: {
+  clearButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#6366f1',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.light.backgroundSecondary,
+  },
+  
+  // Filter Sections (2 rows)
+  filterSection: {
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  clearChip: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: '#ef4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countryChip: {
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 16,
+    borderRadius: 8,
     borderWidth: 1.5,
-    borderColor: Colors.light.border,
-    minWidth: 32,
+    minWidth: 38,
   },
-  filterChipEmoji: {
+  countryChipActive: {
+    backgroundColor: '#6366f1',
+    borderColor: '#6366f1',
+  },
+  countryEmoji: {
     fontSize: 16,
   },
-  filterChipText: {
+  categoryChip: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1.5,
+  },
+  categoryChipActive: {
+    backgroundColor: '#8b5cf6',
+    borderColor: '#8b5cf6',
+  },
+  categoryText: {
     fontSize: 12,
-    fontWeight: '600' as const,
-    color: Colors.light.text,
+    fontWeight: '600',
   },
-  filterChipTextActive: {
-    color: '#fff',
-  },
-
-  sortHeader: {
-    backgroundColor: Colors.light.background,
-    paddingHorizontal: 16,
+  
+  // Sort Bar
+  sortBar: {
+    paddingHorizontal: 12,
     paddingVertical: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
   },
-  sortContainer: {
+  sortButtons: {
     flexDirection: 'row',
     gap: 6,
-    flex: 1,
   },
   sortButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.light.backgroundSecondary,
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 8,
     gap: 4,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
+    backgroundColor: 'transparent',
+  },
+  sortButtonActive: {
+    backgroundColor: '#6366f1',
   },
   sortButtonText: {
-    fontSize: 12,
-    fontWeight: '600' as const,
-    color: Colors.light.text,
-  },
-  sortButtonTextActive: {
-    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
   },
   resultsCount: {
-    fontSize: 13,
-    fontWeight: '600' as const,
-    color: Colors.light.textSecondary,
-    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: '700',
   },
-  questionsList: {
+  
+  // List Content
+  listContent: {
     padding: 12,
-    gap: 10,
-    paddingBottom: 100,
+    paddingBottom: 140,
+    gap: 8,
   },
-  questionCard: {
-    backgroundColor: Colors.light.card,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
+  
+  // Question Item (Single Line)
+  questionItem: {
+    marginBottom: 0,
+  },
+  questionItemInner: {
     flexDirection: 'row',
-  },
-  questionCardContent: {
-    flex: 1,
-    padding: 12,
-  },
-  bookmarkButton: {
-    padding: 12,
-    justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  questionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 10,
+  statusLine: {
+    width: 4,
+    height: '100%',
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
   },
-  userInfo: {
-    flexDirection: 'row',
-    flex: 1,
+  itemAvatar: {
+    marginLeft: 12,
+    marginRight: 10,
+    paddingVertical: 10,
   },
-  userAvatar: {
+  avatarImg: {
     width: 36,
     height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  userAvatarText: {
-    fontSize: 15,
-    fontWeight: '600' as const,
-    color: '#fff',
-  },
-  userDetails: {
-    flex: 1,
-  },
-  userNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  userName: {
-    fontSize: 13,
-    fontWeight: '600' as const,
-    color: Colors.light.text,
-  },
-  levelBadge: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  countryDateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 2,
-    gap: 4,
-  },
-  countryFlag: {
+  avatarText: {
     fontSize: 14,
-  },
-  countryCode: {
-    fontSize: 11,
-    fontWeight: '600' as const,
-    color: Colors.light.textSecondary,
-  },
-  dot: {
-    fontSize: 11,
-    color: Colors.light.textSecondary,
-  },
-  questionTime: {
-    fontSize: 11,
-    color: Colors.light.textSecondary,
-  },
-  questionTitle: {
-    fontSize: 15,
-    fontWeight: '600' as const,
-    color: Colors.light.text,
-    marginBottom: 10,
-    lineHeight: 21,
-  },
-  questionFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  stat: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  statText: {
-    fontSize: 13,
-    fontWeight: '600' as const,
-    color: Colors.light.textSecondary,
-  },
-  resolvedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    backgroundColor: `${Colors.light.success}15`,
-    borderRadius: 6,
-  },
-  resolvedText: {
-    fontSize: 12,
-    fontWeight: '600' as const,
-    color: Colors.light.success,
-  },
-  askButton: {
-    position: 'absolute',
-    bottom: 24,
-    right: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 30,
-    gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  askButtonText: {
+    fontWeight: '700',
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '600' as const,
   },
+  itemContent: {
+    flex: 1,
+    paddingVertical: 10,
+  },
+  itemMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 2,
+  },
+  itemFlag: {
+    fontSize: 12,
+  },
+  itemCategory: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  itemDot: {
+    fontSize: 8,
+  },
+  itemDate: {
+    fontSize: 10,
+  },
+  itemTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 18,
+    marginBottom: 4,
+    paddingRight: 4,
+  },
+  itemStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  itemStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  itemStatText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#6366f1',
+  },
+  itemResolved: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  itemResolvedText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#22c55e',
+  },
+  itemActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingRight: 10,
+  },
+  bookmarkBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bookmarkBtnActive: {
+    backgroundColor: '#eef2ff',
+  },
+  
+  // Empty State
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
+    paddingVertical: 50,
+    paddingHorizontal: 24,
+  },
+  emptyIconBg: {
+    width: 72,
+    height: 72,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
   },
   emptyStateText: {
     fontSize: 18,
-    fontWeight: '600' as const,
-    color: Colors.light.text,
-    marginTop: 16,
+    fontWeight: '700',
+    marginBottom: 6,
   },
   emptyStateSubtext: {
-    fontSize: 14,
-    color: Colors.light.textSecondary,
-    marginTop: 4,
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 20,
   },
+  emptyAskButton: {
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  emptyAskButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    gap: 6,
+  },
+  emptyAskButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  
+  // FAB
+  fabContainer: {
+    position: 'absolute',
+    bottom: 95,
+    right: 16,
+  },
+  fab: {
+    width: 54,
+    height: 54,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#6366f1',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  
+  // RTL
   rtl: {
     flexDirection: 'row-reverse',
   },
@@ -625,3 +875,4 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
 });
+

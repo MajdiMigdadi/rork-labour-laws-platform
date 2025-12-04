@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,25 +7,44 @@ import {
   TouchableOpacity,
   TextInput,
   FlatList,
+  Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Search, ChevronRight, BookOpen, Bookmark, Clock, TrendingUp, X } from 'lucide-react-native';
-import Colors from '@/constants/colors';
+import { Search, ChevronRight, BookOpen, Bookmark, Clock, TrendingUp, X, Scale, FileText, CheckCircle } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useData } from '@/contexts/DataContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/hooks/useTheme';
 import { useFavorites } from '@/contexts/FavoritesContext';
+import FlagDisplay from '@/components/FlagDisplay';
+import { SkeletonLawsList } from '@/components/Skeleton';
+import SearchWithHistory from '@/components/SearchWithHistory';
+import HapticRefreshControl from '@/components/HapticRefreshControl';
 
 export default function LawsScreen() {
   const router = useRouter();
-  const { countries, laws, categories } = useData();
-  const { isRTL } = useLanguage();
+  const { countries, laws, categories, isLoading } = useData();
+  const { isRTL, t, getTranslatedName } = useLanguage();
   const theme = useTheme();
   const { toggleLawFavorite, isLawFavorited } = useFavorites();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'recent' | 'popular'>('recent');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Animations
+  const headerAnim = useRef(new Animated.Value(0)).current;
+  
+  useEffect(() => {
+    Animated.spring(headerAnim, {
+      toValue: 1,
+      tension: 50,
+      friction: 8,
+      useNativeDriver: true,
+    }).start();
+  }, []);
 
   const clearFilters = () => {
     setSearchQuery('');
@@ -34,6 +53,14 @@ export default function LawsScreen() {
   };
 
   const hasActiveFilters = searchQuery !== '' || selectedCountry || selectedCategory;
+
+  // Pull-to-refresh handler
+  const onRefresh = async () => {
+    setRefreshing(true);
+    // Simulate data refresh (in real app, this would refetch from API)
+    await new Promise(resolve => setTimeout(resolve, 1200));
+    setRefreshing(false);
+  };
 
   const filteredLaws = useMemo(() => {
     let filtered = laws.filter(law => {
@@ -55,180 +82,275 @@ export default function LawsScreen() {
     });
   }, [laws, searchQuery, selectedCountry, selectedCategory, sortBy, countries]);
 
+  // Stats
+  const totalLaws = laws.length;
+  const totalCountries = countries.length;
+  const totalCategories = categories.length;
+
   const getCategoryName = (categoryId: string) => {
-    return categories.find(c => c.id === categoryId)?.name || '';
+    const category = categories.find(c => c.id === categoryId);
+    return category ? getTranslatedName(category) : '';
   };
+
+  const renderLawItem = ({ item, index }: { item: typeof laws[0]; index: number }) => {
+    const country = countries.find(c => c.id === item.countryId);
+    const category = getCategoryName(item.categoryId);
+    
+    const cardAnim = new Animated.Value(0);
+    Animated.spring(cardAnim, {
+      toValue: 1,
+      tension: 50,
+      friction: 8,
+      delay: index * 40,
+      useNativeDriver: true,
+    }).start();
+
+    return (
+      <Animated.View
+        style={[
+          styles.lawItem,
+          {
+            opacity: cardAnim,
+            transform: [{ translateX: cardAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [-20, 0],
+            })}],
+          },
+        ]}
+      >
+        <TouchableOpacity
+          style={[styles.lawItemInner, { backgroundColor: theme.card }]}
+          activeOpacity={0.8}
+          onPress={() => router.push(`/(tabs)/law-detail?id=${item.id}`)}
+        >
+          {/* Status Line */}
+          <View style={styles.statusLine} />
+          
+          {/* Flag */}
+          <View style={styles.flagContainer}>
+            <FlagDisplay flag={country?.flag || ''} size="medium" />
+          </View>
+          
+          {/* Content */}
+          <View style={styles.itemContent}>
+            <View style={styles.itemMeta}>
+              <FlagDisplay flag={country?.flag || ''} size="small" />
+              <Text style={[styles.itemDot, { color: theme.textSecondary }]}>•</Text>
+              <Text style={[styles.itemCategory, { color: theme.secondary }]}>{category}</Text>
+              <Text style={[styles.itemDot, { color: theme.textSecondary }]}>•</Text>
+              <Text style={[styles.itemDate, { color: theme.textSecondary }]}>
+                {new Date(item.lastUpdated).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </Text>
+            </View>
+            <Text style={[styles.itemTitle, { color: theme.text }]} numberOfLines={1}>
+              {item.title}
+            </Text>
+            <Text style={[styles.itemDesc, { color: theme.textSecondary }]} numberOfLines={1}>
+              {item.description}
+            </Text>
+          </View>
+          
+          {/* Right actions */}
+          <View style={styles.itemActions}>
+            <TouchableOpacity
+              style={[
+                styles.bookmarkBtn,
+                isLawFavorited(item.id) && styles.bookmarkBtnActive
+              ]}
+              onPress={() => toggleLawFavorite(item.id)}
+              activeOpacity={0.7}
+            >
+              <Bookmark
+                size={16}
+                color={isLawFavorited(item.id) ? '#6366f1' : theme.textSecondary}
+                fill={isLawFavorited(item.id) ? '#6366f1' : 'transparent'}
+              />
+            </TouchableOpacity>
+            <ChevronRight size={18} color={theme.textSecondary} />
+          </View>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
+
+  // Show skeleton while loading
+  if (isLoading) {
+    return <SkeletonLawsList />;
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundSecondary }]}>
-      <View style={[styles.searchSection, { backgroundColor: theme.background, borderBottomColor: theme.border }]}>
-        <View style={[styles.searchBar, { backgroundColor: theme.card, borderColor: theme.border }, isRTL && styles.rtl]}>
-          <Search size={18} color={theme.textSecondary} />
-          <TextInput
-            style={[styles.searchInput, { color: theme.text }, isRTL && styles.rtlText]}
-            placeholder="Search laws..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholderTextColor={theme.textSecondary}
-            textAlign={isRTL ? 'right' : 'left'}
-          />
-          {searchQuery !== '' && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <X size={16} color={theme.textSecondary} />
-            </TouchableOpacity>
-          )}
-        </View>
+      {/* Stats Header */}
+      <Animated.View 
+        style={[
+          styles.statsHeader,
+          { backgroundColor: theme.background },
+          {
+            opacity: headerAnim,
+            transform: [{ translateY: headerAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [-15, 0],
+            })}],
+          },
+        ]}
+      >
+        <LinearGradient
+          colors={['#6366f1', '#8b5cf6']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.statsCard}
+        >
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <View style={styles.statIconBg}>
+                <Scale size={14} color="#6366f1" />
+              </View>
+              <View style={styles.statTextCol}>
+                <Text style={styles.statNumber}>{totalLaws}</Text>
+                <Text style={styles.statLabel}>{t.laws}</Text>
+              </View>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <View style={[styles.statIconBg, { backgroundColor: '#dcfce7' }]}>
+                <CheckCircle size={14} color="#22c55e" />
+              </View>
+              <View style={styles.statTextCol}>
+                <Text style={styles.statNumber}>{totalCountries}</Text>
+                <Text style={styles.statLabel}>{t.countries}</Text>
+              </View>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <View style={[styles.statIconBg, { backgroundColor: '#fef3c7' }]}>
+                <FileText size={14} color="#f59e0b" />
+              </View>
+              <View style={styles.statTextCol}>
+                <Text style={styles.statNumber}>{totalCategories}</Text>
+                <Text style={styles.statLabel}>{t.categories}</Text>
+              </View>
+            </View>
+          </View>
+        </LinearGradient>
+      </Animated.View>
+
+      {/* Search */}
+      <View style={[styles.searchSection, { backgroundColor: theme.background }]}>
+        <SearchWithHistory
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder={t.searchLaws}
+          storageKey="laws"
+          suggestions={laws.map(l => l.title)}
+          popularSearches={['Minimum Wage', 'Annual Leave', 'Overtime', 'Termination', 'Working Hours', 'Health Insurance']}
+          onFocus={() => setIsSearchFocused(true)}
+          onBlur={() => setIsSearchFocused(false)}
+        />
       </View>
 
-      <View style={[styles.filtersSection, { backgroundColor: theme.background, borderBottomColor: theme.border }]}>
+      {/* Filter Row 1: Countries */}
+      <View style={[styles.filterSection, { backgroundColor: theme.background }]}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filtersContent}
+          contentContainerStyle={styles.filterRow}
         >
           {hasActiveFilters && (
-            <TouchableOpacity
-              style={[styles.filterChip, { backgroundColor: theme.error, borderColor: theme.error }]}
-              onPress={clearFilters}
-            >
-              <X size={14} color="#fff" />
+            <TouchableOpacity style={styles.clearChip} onPress={clearFilters}>
+              <X size={12} color="#fff" />
             </TouchableOpacity>
           )}
-
           {countries.map(country => (
             <TouchableOpacity
               key={country.id}
               style={[
-                styles.filterChip,
-                { backgroundColor: theme.card, borderColor: theme.border },
-                selectedCountry === country.id && { backgroundColor: theme.primary, borderColor: theme.primary },
+                styles.countryChip,
+                { backgroundColor: theme.card, borderColor: selectedCountry === country.id ? '#6366f1' : theme.border },
+                selectedCountry === country.id && styles.countryChipActive,
               ]}
               onPress={() => setSelectedCountry(country.id === selectedCountry ? null : country.id)}
             >
-              <Text style={styles.filterChipEmoji}>{country.flag}</Text>
+              <FlagDisplay flag={country.flag} size="small" />
             </TouchableOpacity>
           ))}
+        </ScrollView>
+      </View>
 
-          <View style={[styles.divider, { backgroundColor: theme.border }]} />
-
+      {/* Filter Row 2: Categories */}
+      <View style={[styles.filterSection, { backgroundColor: theme.background, paddingTop: 0 }]}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}
+        >
           {categories.map(category => (
             <TouchableOpacity
               key={category.id}
               style={[
-                styles.filterChip,
-                { backgroundColor: theme.card, borderColor: theme.border },
-                selectedCategory === category.id && {
-                  backgroundColor: theme.secondary,
-                  borderColor: theme.secondary,
-                },
+                styles.categoryChip,
+                { backgroundColor: theme.card, borderColor: selectedCategory === category.id ? '#8b5cf6' : theme.border },
+                selectedCategory === category.id && styles.categoryChipActive,
               ]}
               onPress={() => setSelectedCategory(category.id === selectedCategory ? null : category.id)}
             >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  { color: theme.text },
-                  selectedCategory === category.id && styles.filterChipTextActive,
-                ]}
-              >
-                {category.name}
+              <Text style={[
+                styles.categoryText,
+                { color: selectedCategory === category.id ? '#fff' : theme.text },
+              ]}>
+                {getTranslatedName(category)}
               </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
       </View>
 
-      <View style={[styles.sortHeader, { backgroundColor: theme.background, borderBottomColor: theme.border }]}>
-        <View style={styles.sortContainer}>
+      {/* Sort Bar */}
+      <View style={[styles.sortBar, { backgroundColor: theme.background, borderBottomColor: theme.border }]}>
+        <View style={styles.sortButtons}>
           <TouchableOpacity
-            style={[styles.sortButton, { backgroundColor: theme.card, borderColor: theme.border }, sortBy === 'recent' && { backgroundColor: theme.primary, borderColor: theme.primary }]}
+            style={[styles.sortButton, sortBy === 'recent' && styles.sortButtonActive]}
             onPress={() => setSortBy('recent')}
           >
-            <Clock size={14} color={sortBy === 'recent' ? '#fff' : theme.text} />
-            <Text style={[styles.sortButtonText, { color: theme.text }, sortBy === 'recent' && styles.sortButtonTextActive]}>
-              Recent
+            <Clock size={12} color={sortBy === 'recent' ? '#fff' : theme.textSecondary} />
+            <Text style={[styles.sortButtonText, { color: sortBy === 'recent' ? '#fff' : theme.textSecondary }]}>
+              {t.recent}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.sortButton, { backgroundColor: theme.card, borderColor: theme.border }, sortBy === 'popular' && { backgroundColor: theme.primary, borderColor: theme.primary }]}
+            style={[styles.sortButton, sortBy === 'popular' && styles.sortButtonActive]}
             onPress={() => setSortBy('popular')}
           >
-            <TrendingUp size={14} color={sortBy === 'popular' ? '#fff' : theme.text} />
-            <Text style={[styles.sortButtonText, { color: theme.text }, sortBy === 'popular' && styles.sortButtonTextActive]}>
-              Popular
+            <TrendingUp size={12} color={sortBy === 'popular' ? '#fff' : theme.textSecondary} />
+            <Text style={[styles.sortButtonText, { color: sortBy === 'popular' ? '#fff' : theme.textSecondary }]}>
+              {t.popular}
             </Text>
           </TouchableOpacity>
         </View>
-        <Text style={[styles.resultsCount, { color: theme.textSecondary }, isRTL && styles.rtlText]}>
+        <Text style={[styles.resultsCount, { color: theme.textSecondary }]}>
           {filteredLaws.length}
         </Text>
       </View>
 
+      {/* Laws List */}
       <FlatList
         data={filteredLaws}
         keyExtractor={item => item.id}
-        contentContainerStyle={styles.lawsList}
-        renderItem={({ item }) => {
-          const country = countries.find(c => c.id === item.countryId);
-
-          return (
-            <View style={[styles.lawCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              <TouchableOpacity
-                style={styles.lawCardContent}
-                activeOpacity={0.7}
-                onPress={() => router.push(`/(tabs)/law-detail?id=${item.id}`)}
-              >
-                <View style={[styles.lawHeader, isRTL && styles.rtl]}>
-                  <View style={[styles.countryInfo, isRTL && styles.rtl]}>
-                    <Text style={styles.countryFlag}>{country?.flag}</Text>
-                    <View style={[styles.countryDetails, isRTL && styles.rtl]}>
-                      <View style={[styles.countryRow, isRTL && styles.rtl]}>
-                        <Text style={[styles.countryCode, { color: theme.text }, isRTL && styles.rtlText]}>{country?.code}</Text>
-                        <Text style={[styles.dot, { color: theme.textSecondary }]}>•</Text>
-                        <View style={[styles.categoryBadge, { backgroundColor: theme.secondary }]}>
-                          <Text style={styles.categoryBadgeText}>{getCategoryName(item.categoryId)}</Text>
-                        </View>
-                      </View>
-                      <Text style={[styles.lawTime, { color: theme.textSecondary }, isRTL && styles.rtlText]}>
-                        {new Date(item.lastUpdated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-
-                <Text style={[styles.lawTitle, { color: theme.text }, isRTL && styles.rtlText]} numberOfLines={2}>{item.title}</Text>
-                <Text style={[styles.lawDescription, { color: theme.textSecondary }, isRTL && styles.rtlText]} numberOfLines={2}>
-                  {item.description}
-                </Text>
-
-                <View style={[styles.lawFooter, isRTL && styles.rtl]}>
-                  <View style={[styles.lawMeta, isRTL && styles.rtl]}>
-                    <BookOpen size={16} color={theme.textSecondary} />
-                    <Text style={[styles.lawMetaText, { color: theme.textSecondary }, isRTL && styles.rtlText]}>View Details</Text>
-                  </View>
-                  <ChevronRight size={20} color={theme.textSecondary} style={isRTL ? { transform: [{ rotate: '180deg' }] } : {}} />
-                </View>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.bookmarkButton}
-                onPress={() => toggleLawFavorite(item.id)}
-                activeOpacity={0.7}
-              >
-                <Bookmark
-                  size={22}
-                  color={isLawFavorited(item.id) ? theme.primary : theme.textSecondary}
-                  fill={isLawFavorited(item.id) ? theme.primary : 'transparent'}
-                />
-              </TouchableOpacity>
-            </View>
-          );
-        }}
+        contentContainerStyle={styles.listContent}
+        renderItem={renderLawItem}
+        refreshControl={
+          <HapticRefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+          />
+        }
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <BookOpen size={48} color={theme.textSecondary} />
-            <Text style={[styles.emptyStateText, { color: theme.text }, isRTL && styles.rtlText]}>No laws found</Text>
-            <Text style={[styles.emptyStateSubtext, { color: theme.textSecondary }, isRTL && styles.rtlText]}>
-              {hasActiveFilters ? 'Try adjusting your filters' : 'No laws available'}
+          <View style={[styles.emptyState, { backgroundColor: theme.card }]}>
+            <LinearGradient colors={['#eef2ff', '#e0e7ff']} style={styles.emptyIconBg}>
+              <BookOpen size={28} color="#6366f1" />
+            </LinearGradient>
+            <Text style={[styles.emptyStateText, { color: theme.text }]}>{t.noLawsFound}</Text>
+            <Text style={[styles.emptyStateSubtext, { color: theme.textSecondary }]}>
+              {hasActiveFilters ? t.tryAdjustingFilters : t.noLawsAvailable}
             </Text>
           </View>
         }
@@ -240,221 +362,307 @@ export default function LawsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.backgroundSecondary,
   },
+  
+  // Stats Header
+  statsHeader: {
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 6,
+  },
+  statsCard: {
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    shadowColor: '#6366f1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    gap: 8,
+  },
+  statIconBg: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: '#eef2ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statTextCol: {
+    alignItems: 'flex-start',
+  },
+  statNumber: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#fff',
+    lineHeight: 18,
+  },
+  statLabel: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.75)',
+    fontWeight: '500',
+  },
+  statDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  
+  // Search Section
   searchSection: {
-    backgroundColor: Colors.light.background,
-    paddingTop: 12,
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 4,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.light.backgroundSecondary,
-    borderRadius: 12,
+    borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
+    paddingVertical: 10,
+    borderWidth: 1.5,
+  },
+  searchBarFocused: {
+    shadowColor: '#6366f1',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   searchInput: {
     flex: 1,
     marginLeft: 8,
-    fontSize: 15,
-    color: Colors.light.text,
+    fontSize: 14,
+    paddingVertical: 0,
   },
-  filtersSection: {
-    backgroundColor: Colors.light.background,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
-  },
-  filtersContent: {
-    paddingHorizontal: 16,
-    gap: 6,
-  },
-  filterChip: {
+  clearButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#6366f1',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.light.backgroundSecondary,
+  },
+  
+  // Filter Sections (2 rows)
+  filterSection: {
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  clearChip: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: '#ef4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countryChip: {
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 16,
+    borderRadius: 8,
     borderWidth: 1.5,
-    borderColor: Colors.light.border,
-    minWidth: 32,
+    minWidth: 38,
   },
-  filterChipEmoji: {
+  countryChipActive: {
+    backgroundColor: '#6366f1',
+    borderColor: '#6366f1',
+  },
+  countryEmoji: {
     fontSize: 16,
   },
-  filterChipText: {
+  categoryChip: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1.5,
+  },
+  categoryChipActive: {
+    backgroundColor: '#8b5cf6',
+    borderColor: '#8b5cf6',
+  },
+  categoryText: {
     fontSize: 12,
-    fontWeight: '600' as const,
-    color: Colors.light.text,
+    fontWeight: '600',
   },
-  filterChipTextActive: {
-    color: '#fff',
-  },
-  divider: {
-    width: 1,
-    backgroundColor: Colors.light.border,
-    marginHorizontal: 4,
-  },
-  sortHeader: {
-    backgroundColor: Colors.light.background,
-    paddingHorizontal: 16,
+  
+  // Sort Bar
+  sortBar: {
+    paddingHorizontal: 12,
     paddingVertical: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
   },
-  sortContainer: {
+  sortButtons: {
     flexDirection: 'row',
     gap: 6,
-    flex: 1,
   },
   sortButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.light.backgroundSecondary,
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 8,
     gap: 4,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
+    backgroundColor: 'transparent',
+  },
+  sortButtonActive: {
+    backgroundColor: '#6366f1',
   },
   sortButtonText: {
-    fontSize: 12,
-    fontWeight: '600' as const,
-    color: Colors.light.text,
-  },
-  sortButtonTextActive: {
-    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
   },
   resultsCount: {
-    fontSize: 13,
-    fontWeight: '600' as const,
-    color: Colors.light.textSecondary,
-    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: '700',
   },
-  lawsList: {
+  
+  // List Content
+  listContent: {
     padding: 12,
-    gap: 10,
-    paddingBottom: 100,
+    paddingBottom: 140,
+    gap: 8,
   },
-  lawCard: {
-    backgroundColor: Colors.light.card,
+  
+  // Law Item (Single Line)
+  lawItem: {
+    marginBottom: 0,
+  },
+  lawItemInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
-    flexDirection: 'row',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  lawCardContent: {
-    flex: 1,
-    padding: 12,
+  statusLine: {
+    width: 4,
+    height: '100%',
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: '#6366f1',
   },
-  bookmarkButton: {
-    padding: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  lawHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 10,
-  },
-  countryInfo: {
-    flexDirection: 'row',
-    flex: 1,
-  },
-  countryFlag: {
-    fontSize: 28,
+  flagContainer: {
+    marginLeft: 12,
     marginRight: 10,
+    paddingVertical: 10,
   },
-  countryDetails: {
+  flag: {
+    fontSize: 26,
+  },
+  itemContent: {
     flex: 1,
+    paddingVertical: 10,
   },
-  countryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  countryCode: {
-    fontSize: 13,
-    fontWeight: '600' as const,
-    color: Colors.light.text,
-  },
-  dot: {
-    fontSize: 11,
-    color: Colors.light.textSecondary,
-  },
-  categoryBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  categoryBadgeText: {
-    fontSize: 11,
-    fontWeight: '600' as const,
-    color: '#fff',
-  },
-  lawTime: {
-    fontSize: 11,
-    color: Colors.light.textSecondary,
-    marginTop: 2,
-  },
-  lawTitle: {
-    fontSize: 15,
-    fontWeight: '600' as const,
-    color: Colors.light.text,
-    marginBottom: 8,
-    lineHeight: 21,
-  },
-  lawDescription: {
-    fontSize: 13,
-    color: Colors.light.textSecondary,
-    lineHeight: 18,
-    marginBottom: 10,
-  },
-  lawFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  lawMeta: {
+  itemMeta: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    marginBottom: 2,
   },
-  lawMetaText: {
-    fontSize: 13,
-    fontWeight: '600' as const,
-    color: Colors.light.textSecondary,
+  itemCountry: {
+    fontSize: 11,
+    fontWeight: '700',
   },
+  itemFlag: {
+    fontSize: 14,
+  },
+  itemCategory: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  itemDot: {
+    fontSize: 8,
+  },
+  itemDate: {
+    fontSize: 10,
+  },
+  itemTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 18,
+    marginBottom: 2,
+    paddingRight: 4,
+  },
+  itemDesc: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  itemActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingRight: 10,
+  },
+  bookmarkBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bookmarkBtnActive: {
+    backgroundColor: '#eef2ff',
+  },
+  
+  // Empty State
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
+    paddingVertical: 40,
+    borderRadius: 14,
+    marginHorizontal: 12,
+  },
+  emptyIconBg: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
   },
   emptyStateText: {
-    fontSize: 18,
-    fontWeight: '600' as const,
-    color: Colors.light.text,
-    marginTop: 16,
+    fontSize: 15,
+    fontWeight: '600',
   },
   emptyStateSubtext: {
-    fontSize: 14,
-    color: Colors.light.textSecondary,
+    fontSize: 12,
     marginTop: 4,
   },
+  
+  // RTL
   rtl: {
     flexDirection: 'row-reverse',
   },

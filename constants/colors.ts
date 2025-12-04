@@ -1,15 +1,16 @@
-const primary = '#0f766e';
-const primaryDark = '#0d5e55';
-const secondary = '#14b8a6';
-const accent = '#2dd4bf';
+// Modern Indigo/Purple theme
+const primary = '#6366f1';
+const primaryDark = '#4f46e5';
+const secondary = '#8b5cf6';
+const accent = '#a78bfa';
 
 export default {
   light: {
-    text: '#0f172a',
-    textSecondary: '#64748b',
+    text: '#1e1b4b',
+    textSecondary: '#6b7280',
     background: '#ffffff',
     backgroundSecondary: '#f8fafc',
-    border: '#e2e8f0',
+    border: '#e5e7eb',
     tint: primary,
     primary: primary,
     primaryDark: primaryDark,
@@ -18,17 +19,17 @@ export default {
     success: '#10b981',
     warning: '#f59e0b',
     error: '#ef4444',
-    tabIconDefault: '#94a3b8',
+    tabIconDefault: '#9ca3af',
     tabIconSelected: primary,
     card: '#ffffff',
-    shadow: '#00000010',
+    shadow: '#6366f110',
   },
   dark: {
     text: '#f1f5f9',
     textSecondary: '#94a3b8',
-    background: '#0f172a',
-    backgroundSecondary: '#1e293b',
-    border: '#334155',
+    background: '#0f0d1a',
+    backgroundSecondary: '#1e1b2e',
+    border: '#312e81',
     tint: accent,
     primary: primary,
     primaryDark: primaryDark,
@@ -37,9 +38,9 @@ export default {
     success: '#10b981',
     warning: '#f59e0b',
     error: '#ef4444',
-    tabIconDefault: '#64748b',
+    tabIconDefault: '#6b7280',
     tabIconSelected: accent,
-    card: '#1e293b',
+    card: '#1e1b2e',
     shadow: '#00000040',
   },
 };

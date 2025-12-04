@@ -31,7 +31,7 @@ export interface Country {
     ar: string;
   };
   code: string;
-  flag: string;
+  flag: string; // emoji flag
   lawCount: number;
 }
 

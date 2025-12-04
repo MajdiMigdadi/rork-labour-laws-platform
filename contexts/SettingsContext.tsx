@@ -74,6 +74,7 @@ export const [SettingsProvider, useSettings] = createContextHook(() => {
         try {
           const parsed = JSON.parse(stored);
           console.log('Settings parsed successfully');
+          console.log('Loaded logo:', parsed.logo ? `Found (length: ${parsed.logo.length})` : 'Not set');
           setSettings({ ...defaultSettings, ...parsed });
         } catch (parseError) {
           console.error('Failed to parse settings JSON, resetting to defaults:', parseError);
@@ -95,12 +96,23 @@ export const [SettingsProvider, useSettings] = createContextHook(() => {
 
   const updateSettings = async (updates: Partial<AppSettings>) => {
     try {
+      console.log('=== UPDATE SETTINGS ===');
+      console.log('Updates received:', Object.keys(updates));
+      if (updates.logo) {
+        console.log('Logo being saved, length:', updates.logo.length);
+        console.log('Logo preview:', updates.logo.substring(0, 100));
+      }
+      
       const newSettings = { ...settings, ...updates };
       const jsonString = JSON.stringify(newSettings);
-      console.log('Updating settings, data length:', jsonString.length);
+      console.log('Total settings data length:', jsonString.length);
+      
       await AsyncStorage.setItem(SETTINGS_KEY, jsonString);
       setSettings(newSettings);
-      console.log('Settings updated successfully');
+      
+      console.log('Settings saved successfully');
+      console.log('New logo in state:', newSettings.logo ? `Yes (${newSettings.logo.length} chars)` : 'No');
+      console.log('========================');
       return true;
     } catch (error) {
       console.error('Failed to update settings:', error);

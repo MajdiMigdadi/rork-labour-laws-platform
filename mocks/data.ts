@@ -37,25 +37,25 @@ export const mockUsers: User[] = [
 ];
 
 export const mockCountries: Country[] = [
-  { id: '1', name: 'United States', code: 'US', flag: '🇺🇸', lawCount: 45 },
-  { id: '2', name: 'United Kingdom', code: 'GB', flag: '🇬🇧', lawCount: 38 },
-  { id: '3', name: 'Canada', code: 'CA', flag: '🇨🇦', lawCount: 32 },
-  { id: '4', name: 'Germany', code: 'DE', flag: '🇩🇪', lawCount: 41 },
-  { id: '5', name: 'France', code: 'FR', flag: '🇫🇷', lawCount: 36 },
-  { id: '6', name: 'Australia', code: 'AU', flag: '🇦🇺', lawCount: 29 },
-  { id: '7', name: 'Japan', code: 'JP', flag: '🇯🇵', lawCount: 33 },
-  { id: '8', name: 'India', code: 'IN', flag: '🇮🇳', lawCount: 52 },
+  { id: '1', name: 'United States', nameTranslations: { en: 'United States', ar: 'الولايات المتحدة' }, code: 'US', flag: '🇺🇸', lawCount: 45 },
+  { id: '2', name: 'United Kingdom', nameTranslations: { en: 'United Kingdom', ar: 'المملكة المتحدة' }, code: 'GB', flag: '🇬🇧', lawCount: 38 },
+  { id: '3', name: 'Canada', nameTranslations: { en: 'Canada', ar: 'كندا' }, code: 'CA', flag: '🇨🇦', lawCount: 32 },
+  { id: '4', name: 'Germany', nameTranslations: { en: 'Germany', ar: 'ألمانيا' }, code: 'DE', flag: '🇩🇪', lawCount: 41 },
+  { id: '5', name: 'France', nameTranslations: { en: 'France', ar: 'فرنسا' }, code: 'FR', flag: '🇫🇷', lawCount: 36 },
+  { id: '6', name: 'Australia', nameTranslations: { en: 'Australia', ar: 'أستراليا' }, code: 'AU', flag: '🇦🇺', lawCount: 29 },
+  { id: '7', name: 'Japan', nameTranslations: { en: 'Japan', ar: 'اليابان' }, code: 'JP', flag: '🇯🇵', lawCount: 33 },
+  { id: '8', name: 'India', nameTranslations: { en: 'India', ar: 'الهند' }, code: 'IN', flag: '🇮🇳', lawCount: 52 },
 ];
 
 export const mockCategories: LawCategory[] = [
-  { id: '1', name: 'Working Hours', icon: 'clock' },
-  { id: '2', name: 'Minimum Wage', icon: 'dollar-sign' },
-  { id: '3', name: 'Leave & Holidays', icon: 'calendar' },
-  { id: '4', name: 'Termination', icon: 'user-x' },
-  { id: '5', name: 'Discrimination', icon: 'shield' },
-  { id: '6', name: 'Health & Safety', icon: 'heart-pulse' },
-  { id: '7', name: 'Benefits', icon: 'gift' },
-  { id: '8', name: 'Contracts', icon: 'file-text' },
+  { id: '1', name: 'Working Hours', nameTranslations: { en: 'Working Hours', ar: 'ساعات العمل' }, icon: 'clock' },
+  { id: '2', name: 'Minimum Wage', nameTranslations: { en: 'Minimum Wage', ar: 'الحد الأدنى للأجور' }, icon: 'dollar-sign' },
+  { id: '3', name: 'Leave & Holidays', nameTranslations: { en: 'Leave & Holidays', ar: 'الإجازات والعطل' }, icon: 'calendar' },
+  { id: '4', name: 'Termination', nameTranslations: { en: 'Termination', ar: 'إنهاء الخدمة' }, icon: 'user-x' },
+  { id: '5', name: 'Discrimination', nameTranslations: { en: 'Discrimination', ar: 'التمييز' }, icon: 'shield' },
+  { id: '6', name: 'Health & Safety', nameTranslations: { en: 'Health & Safety', ar: 'الصحة والسلامة' }, icon: 'heart-pulse' },
+  { id: '7', name: 'Benefits', nameTranslations: { en: 'Benefits', ar: 'المزايا' }, icon: 'gift' },
+  { id: '8', name: 'Contracts', nameTranslations: { en: 'Contracts', ar: 'العقود' }, icon: 'file-text' },
 ];
 
 export const mockLaws: Law[] = [

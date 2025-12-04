@@ -151,62 +151,106 @@ export default function LawFormModal({ visible, onClose, onSave, law }: LawFormM
               />
             </View>
 
-            <View style={styles.formGroup}>
+            <View style={[styles.formGroup, showCountryPicker && styles.formGroupOpen]}>
               <Text style={[styles.label, { color: theme.text }, isRTL && styles.rtl]}>{t.country}</Text>
               <TouchableOpacity
                 style={[styles.picker, { backgroundColor: theme.card, borderColor: theme.border }, isRTL && styles.rtl]}
-                onPress={() => setShowCountryPicker(!showCountryPicker)}
+                onPress={() => {
+                  setShowCountryPicker(!showCountryPicker);
+                  setShowCategoryPicker(false);
+                }}
               >
                 <Text style={[styles.pickerText, { color: theme.text }, !selectedCountry && { color: theme.textSecondary }]}>
                   {selectedCountry ? `${selectedCountry.flag} ${selectedCountry.name}` : t.country}
                 </Text>
-                <ChevronDown size={20} color={theme.textSecondary} />
+                <ChevronDown 
+                  size={20} 
+                  color={theme.textSecondary} 
+                  style={showCountryPicker ? { transform: [{ rotate: '180deg' }] } : {}}
+                />
               </TouchableOpacity>
               {showCountryPicker && (
-                <View style={[styles.pickerOptions, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                  {countries.map(country => (
-                    <TouchableOpacity
-                      key={country.id}
-                      style={[styles.pickerOption, { borderBottomColor: theme.border }]}
-                      onPress={() => {
-                        setCountryId(country.id);
-                        setShowCountryPicker(false);
-                      }}
-                    >
-                      <Text style={[styles.pickerOptionText, { color: theme.text }]}>
-                        {country.flag} {country.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                <View style={[styles.pickerOptions, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                  <ScrollView 
+                    style={styles.pickerScroll} 
+                    nestedScrollEnabled={true}
+                    showsVerticalScrollIndicator={true}
+                  >
+                    {countries.map(country => (
+                      <TouchableOpacity
+                        key={country.id}
+                        style={[
+                          styles.pickerOption, 
+                          { borderBottomColor: theme.border },
+                          countryId === country.id && { backgroundColor: `${theme.primary}15` }
+                        ]}
+                        onPress={() => {
+                          setCountryId(country.id);
+                          setShowCountryPicker(false);
+                        }}
+                      >
+                        <Text style={[
+                          styles.pickerOptionText, 
+                          { color: theme.text },
+                          countryId === country.id && { color: theme.primary, fontWeight: '600' }
+                        ]}>
+                          {country.flag} {country.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
                 </View>
               )}
             </View>
 
-            <View style={styles.formGroup}>
+            <View style={[styles.formGroup, showCategoryPicker && styles.formGroupOpen]}>
               <Text style={[styles.label, { color: theme.text }, isRTL && styles.rtl]}>{t.category}</Text>
               <TouchableOpacity
                 style={[styles.picker, { backgroundColor: theme.card, borderColor: theme.border }, isRTL && styles.rtl]}
-                onPress={() => setShowCategoryPicker(!showCategoryPicker)}
+                onPress={() => {
+                  setShowCategoryPicker(!showCategoryPicker);
+                  setShowCountryPicker(false);
+                }}
               >
                 <Text style={[styles.pickerText, { color: theme.text }, !selectedCategory && { color: theme.textSecondary }]}>
                   {selectedCategory ? selectedCategory.name : t.category}
                 </Text>
-                <ChevronDown size={20} color={theme.textSecondary} />
+                <ChevronDown 
+                  size={20} 
+                  color={theme.textSecondary}
+                  style={showCategoryPicker ? { transform: [{ rotate: '180deg' }] } : {}}
+                />
               </TouchableOpacity>
               {showCategoryPicker && (
-                <View style={[styles.pickerOptions, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                  {categories.map(category => (
-                    <TouchableOpacity
-                      key={category.id}
-                      style={[styles.pickerOption, { borderBottomColor: theme.border }]}
-                      onPress={() => {
-                        setCategoryId(category.id);
-                        setShowCategoryPicker(false);
-                      }}
-                    >
-                      <Text style={[styles.pickerOptionText, { color: theme.text }]}>{category.name}</Text>
-                    </TouchableOpacity>
-                  ))}
+                <View style={[styles.pickerOptions, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                  <ScrollView 
+                    style={styles.pickerScroll} 
+                    nestedScrollEnabled={true}
+                    showsVerticalScrollIndicator={true}
+                  >
+                    {categories.map(category => (
+                      <TouchableOpacity
+                        key={category.id}
+                        style={[
+                          styles.pickerOption, 
+                          { borderBottomColor: theme.border },
+                          categoryId === category.id && { backgroundColor: `${theme.primary}15` }
+                        ]}
+                        onPress={() => {
+                          setCategoryId(category.id);
+                          setShowCategoryPicker(false);
+                        }}
+                      >
+                        <Text style={[
+                          styles.pickerOptionText, 
+                          { color: theme.text },
+                          categoryId === category.id && { color: theme.primary, fontWeight: '600' }
+                        ]}>
+                          {category.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
                 </View>
               )}
             </View>
@@ -345,6 +389,10 @@ const styles = StyleSheet.create({
   },
   formGroup: {
     marginBottom: 20,
+    zIndex: 1,
+  },
+  formGroupOpen: {
+    zIndex: 100,
   },
   label: {
     fontSize: 14,
@@ -383,9 +431,19 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     maxHeight: 200,
+    zIndex: 100,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    overflow: 'hidden',
+  },
+  pickerScroll: {
+    maxHeight: 200,
   },
   pickerOption: {
-    padding: 16,
+    padding: 14,
     borderBottomWidth: 1,
   },
   pickerOptionText: {

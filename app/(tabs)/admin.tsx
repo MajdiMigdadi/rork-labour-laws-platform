@@ -6,7 +6,11 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  TextInput,
+  Dimensions,
+  Platform,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   Plus,
   Edit,
@@ -23,6 +27,15 @@ import {
   Languages,
   Ban,
   UserCog,
+  ChevronRight,
+  Activity,
+  Eye,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  Sparkles,
+  LayoutDashboard,
+  MessageSquare,
 } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useData } from '@/contexts/DataContext';
@@ -33,6 +46,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useContact } from '@/contexts/ContactContext';
 import { Country, Law, LawCategory, User } from '@/types';
 import { Image } from 'expo-image';
+import FlagDisplay from '@/components/FlagDisplay';
 import CountryFormModal from '@/components/CountryFormModal';
 import LawFormModal from '@/components/LawFormModal';
 import CategoryFormModal from '@/components/CategoryFormModal';
@@ -41,13 +55,25 @@ import UserManagementModal from '@/components/UserManagementModal';
 import LanguageSettingsModal from '@/components/LanguageSettingsModal';
 import PhotoPickerModal from '@/components/PhotoPickerModal';
 
-type AdminTab = 'countries' | 'laws' | 'categories' | 'users' | 'settings' | 'contact';
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+type AdminTab = 'dashboard' | 'countries' | 'laws' | 'categories' | 'users' | 'settings' | 'contact';
+
+const NAV_ITEMS: { id: AdminTab; icon: any; label: string; labelAr: string }[] = [
+  { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', labelAr: 'لوحة التحكم' },
+  { id: 'countries', icon: Globe, label: 'Countries', labelAr: 'الدول' },
+  { id: 'laws', icon: FileText, label: 'Laws', labelAr: 'القوانين' },
+  { id: 'categories', icon: Tag, label: 'Categories', labelAr: 'الفئات' },
+  { id: 'users', icon: Users, label: 'Users', labelAr: 'المستخدمين' },
+  { id: 'contact', icon: MessageSquare, label: 'Messages', labelAr: 'الرسائل' },
+  { id: 'settings', icon: SettingsIcon, label: 'Settings', labelAr: 'الإعدادات' },
+];
 
 export default function AdminScreen() {
-  const [activeTab, setActiveTab] = useState<AdminTab>('countries');
+  const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const { isAdmin } = useAuth();
-  const { t, isRTL } = useLanguage();
-  const { settings, updateSettings } = useSettings();
+  const { t, isRTL, getTranslatedName, language } = useLanguage();
+  const { settings, updateSettings, updateLanguageSettings } = useSettings();
   const theme = useTheme();
   const { 
     countries, 
@@ -77,18 +103,25 @@ export default function AdminScreen() {
   const [photoPickerVisible, setPhotoPickerVisible] = useState(false);
   const [uploadType, setUploadType] = useState<'logo' | 'favicon'>('logo');
 
-
   const { users, updateAnyUser, deleteUser, banUser, unbanUser } = useAuth();
   const { messages: contactMessages, markAsRead, replyToMessage, deleteMessage: deleteContactMessage } = useContact();
 
   if (!isAdmin) {
     return (
-      <View style={styles.noAccessContainer}>
-        <Shield size={64} color={Colors.light.textSecondary} />
-        <Text style={styles.noAccessTitle}>{t.accessDenied}</Text>
-        <Text style={styles.noAccessText}>
+      <View style={[styles.noAccessContainer, { backgroundColor: theme.background }]}>
+        <LinearGradient
+          colors={[theme.primary + '20', theme.secondary + '10', 'transparent']}
+          style={styles.noAccessGradient}
+        />
+        <View style={styles.noAccessContent}>
+          <View style={[styles.noAccessIcon, { backgroundColor: theme.primary + '15' }]}>
+            <Shield size={48} color={theme.primary} />
+          </View>
+          <Text style={[styles.noAccessTitle, { color: theme.text }]}>{t.accessDenied}</Text>
+          <Text style={[styles.noAccessText, { color: theme.textSecondary }]}>
           {t.needAdminPrivileges}
         </Text>
+        </View>
       </View>
     );
   }
@@ -115,7 +148,7 @@ export default function AdminScreen() {
   const handleDeleteCountry = (country: Country) => {
     Alert.alert(
       t.deleteCountry,
-      `${t.areYouSure} ${country.name}? ${t.deleteConfirm}`,
+      `${t.areYouSure} ${getTranslatedName(country)}? ${t.deleteConfirm}`,
       [
         { text: t.cancel, style: 'cancel' },
         { 
@@ -123,7 +156,7 @@ export default function AdminScreen() {
           style: 'destructive', 
           onPress: async () => {
             await deleteCountry(country.id);
-            Alert.alert(t.success, `${country.name} deleted`);
+            Alert.alert(t.success, `${getTranslatedName(country)} deleted`);
           } 
         },
       ]
@@ -189,7 +222,7 @@ export default function AdminScreen() {
   const handleDeleteCategory = (category: LawCategory) => {
     Alert.alert(
       t.deleteCategory,
-      `${t.areYouSure} ${category.name}? ${t.deleteConfirm}`,
+      `${t.areYouSure} ${getTranslatedName(category)}? ${t.deleteConfirm}`,
       [
         { text: t.cancel, style: 'cancel' },
         { 
@@ -197,7 +230,7 @@ export default function AdminScreen() {
           style: 'destructive', 
           onPress: async () => {
             await deleteCategory(category.id);
-            Alert.alert(t.success, `${category.name} deleted`);
+            Alert.alert(t.success, `${getTranslatedName(category)} deleted`);
           } 
         },
       ]
@@ -205,511 +238,597 @@ export default function AdminScreen() {
   };
 
   const getCountryName = (countryId: string) => {
-    return countries.find(c => c.id === countryId)?.name || '';
+    const country = countries.find(c => c.id === countryId);
+    return country ? getTranslatedName(country) : '';
   };
 
   const getCategoryName = (categoryId: string) => {
-    return categories.find(c => c.id === categoryId)?.name || '';
+    const category = categories.find(c => c.id === categoryId);
+    return category ? getTranslatedName(category) : '';
   };
 
   const handlePhotoSelected = async (uri: string) => {
     try {
-      const fieldToUpdate = uploadType === 'logo' ? 'logo' : 'favicon';
-      const success = await updateSettings({ [fieldToUpdate]: uri });
-      if (success) {
-        Alert.alert(t.success, `${uploadType === 'logo' ? 'Logo' : 'Favicon'} updated successfully`);
-      } else {
-        Alert.alert(t.error, 'Failed to update image');
+      if (uri.startsWith('blob:')) {
+        Alert.alert(
+          'Warning', 
+          'This image type may not persist. Please use "Use Image URL" option with a permanent URL instead.',
+          [
+            { text: 'Continue Anyway', onPress: () => saveImage(uri) },
+            { text: 'Cancel', style: 'cancel' }
+          ]
+        );
+        return;
       }
+      await saveImage(uri);
     } catch (error) {
       console.error('Error updating image:', error);
       Alert.alert(t.error, 'Failed to update image');
     }
   };
+  
+  const saveImage = async (uri: string) => {
+      const fieldToUpdate = uploadType === 'logo' ? 'logo' : 'favicon';
+      const success = await updateSettings({ [fieldToUpdate]: uri });
+    
+      if (success) {
+        Alert.alert(t.success, `${uploadType === 'logo' ? 'Logo' : 'Favicon'} updated successfully`);
+      } else {
+      Alert.alert(t.error, 'Failed to update image');
+    }
+  };
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
-            <Globe size={24} color={theme.primary} />
-            <Text style={styles.statNumber}>{countries.length}</Text>
-            <Text style={styles.statLabel}>{t.countries}</Text>
-          </View>
-          <View style={styles.statCard}>
-            <FileText size={24} color={theme.secondary} />
-            <Text style={styles.statNumber}>{laws.length}</Text>
-            <Text style={styles.statLabel}>{t.laws}</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Tag size={24} color={theme.accent} />
-            <Text style={styles.statNumber}>{categories.length}</Text>
-            <Text style={styles.statLabel}>{t.categories}</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Users size={24} color={Colors.light.warning} />
-            <Text style={styles.statNumber}>{users.length}</Text>
-            <Text style={styles.statLabel}>{t.users}</Text>
-          </View>
-        </View>
+  // Quick stats for dashboard
+  const unreadMessages = contactMessages.filter(m => m.status === 'unread').length;
+  const activeUsers = users.filter(u => u.status === 'active').length;
+  const bannedUsers = users.filter(u => u.status === 'banned').length;
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={styles.tabs}>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'countries' && { ...styles.activeTab, backgroundColor: theme.primary, borderColor: theme.primary }]}
-              onPress={() => setActiveTab('countries')}
+  const renderDashboard = () => (
+    <View style={styles.dashboardContainer}>
+      {/* Stats Grid */}
+      <View style={styles.statsGrid}>
+        {[
+          { icon: Globe, label: language === 'ar' ? 'الدول' : 'Countries', value: countries.length, color: '#6366F1', gradient: ['#6366F1', '#8B5CF6'] },
+          { icon: FileText, label: language === 'ar' ? 'القوانين' : 'Laws', value: laws.length, color: '#10B981', gradient: ['#10B981', '#34D399'] },
+          { icon: Tag, label: language === 'ar' ? 'الفئات' : 'Categories', value: categories.length, color: '#F59E0B', gradient: ['#F59E0B', '#FBBF24'] },
+          { icon: Users, label: language === 'ar' ? 'المستخدمين' : 'Users', value: users.length, color: '#EC4899', gradient: ['#EC4899', '#F472B6'] },
+        ].map((stat, index) => (
+          <View 
+            key={stat.label}
+            style={[
+              styles.statCard,
+              { backgroundColor: theme.card }
+            ]}
+          >
+            <LinearGradient
+              colors={stat.gradient as [string, string]}
+              style={styles.statIconContainer}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
             >
-              <Globe size={16} color={activeTab === 'countries' ? '#fff' : Colors.light.text} />
-              <Text style={[styles.tabText, activeTab === 'countries' && styles.activeTabText]}>
-                {t.countries}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'laws' && { ...styles.activeTab, backgroundColor: theme.primary, borderColor: theme.primary }]}
-              onPress={() => setActiveTab('laws')}
-            >
-              <FileText size={16} color={activeTab === 'laws' ? '#fff' : Colors.light.text} />
-              <Text style={[styles.tabText, activeTab === 'laws' && styles.activeTabText]}>
-                {t.laws}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'categories' && { ...styles.activeTab, backgroundColor: theme.primary, borderColor: theme.primary }]}
-              onPress={() => setActiveTab('categories')}
-            >
-              <Tag size={16} color={activeTab === 'categories' ? '#fff' : Colors.light.text} />
-              <Text style={[styles.tabText, activeTab === 'categories' && styles.activeTabText]}>
-                {t.categories}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'users' && { ...styles.activeTab, backgroundColor: theme.primary, borderColor: theme.primary }]}
-              onPress={() => setActiveTab('users')}
-            >
-              <Users size={16} color={activeTab === 'users' ? '#fff' : Colors.light.text} />
-              <Text style={[styles.tabText, activeTab === 'users' && styles.activeTabText]}>
-                {t.users}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'contact' && { ...styles.activeTab, backgroundColor: theme.primary, borderColor: theme.primary }]}
-              onPress={() => setActiveTab('contact')}
-            >
-              <Mail size={16} color={activeTab === 'contact' ? '#fff' : Colors.light.text} />
-              <Text style={[styles.tabText, activeTab === 'contact' && styles.activeTabText]}>
-                Contact ({contactMessages.filter(m => m.status === 'unread').length})
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'settings' && { ...styles.activeTab, backgroundColor: theme.primary, borderColor: theme.primary }]}
-              onPress={() => setActiveTab('settings')}
-            >
-              <SettingsIcon size={16} color={activeTab === 'settings' ? '#fff' : Colors.light.text} />
-              <Text style={[styles.tabText, activeTab === 'settings' && styles.activeTabText]}>
-                Settings
-              </Text>
-            </TouchableOpacity>
+              <stat.icon size={22} color="#fff" />
+            </LinearGradient>
+            <Text style={[styles.statValue, { color: theme.text }]}>{stat.value}</Text>
+            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>{stat.label}</Text>
           </View>
-        </ScrollView>
+        ))}
       </View>
 
-      <ScrollView style={styles.content}>
-        {activeTab === 'countries' && (
-          <View style={styles.section}>
-            <View style={[styles.sectionHeader, isRTL && styles.rtl]}>
-              <Text style={styles.sectionTitle}>{t.manageCountries}</Text>
-              <TouchableOpacity style={[styles.addButton, { backgroundColor: theme.primary }]} onPress={handleAddCountry}>
-                <Plus size={20} color="#fff" />
-                <Text style={styles.addButtonText}>{t.add}</Text>
-              </TouchableOpacity>
-            </View>
-
-            {countries.map(country => (
-              <View key={country.id} style={styles.card}>
-                <View style={[styles.cardHeader, isRTL && styles.rtl]}>
-                  <View style={[styles.cardTitle, isRTL && styles.rtl]}>
-                    <Text style={styles.countryFlag}>{country.flag}</Text>
-                    <View>
-                      <Text style={[styles.cardTitleText, isRTL && styles.rtl]}>{country.name}</Text>
-                      <Text style={[styles.cardSubtext, isRTL && styles.rtl]}>{country.lawCount} {t.laws}</Text>
-                    </View>
-                  </View>
-                  <View style={styles.cardActions}>
-                    <TouchableOpacity
-                      style={styles.iconButton}
-                      onPress={() => handleEditCountry(country)}
-                    >
-                      <Edit size={18} color={theme.primary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.iconButton}
-                      onPress={() => handleDeleteCountry(country)}
-                    >
-                      <Trash2 size={18} color={Colors.light.error} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-            ))}
+      {/* Quick Actions */}
+      <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
+        <View style={[styles.sectionCardHeader, isRTL && styles.rtl]}>
+          <View style={[styles.sectionTitleRow, isRTL && styles.rtl]}>
+            <Sparkles size={20} color={theme.primary} />
+            <Text style={[styles.sectionCardTitle, { color: theme.text }]}>
+              {language === 'ar' ? 'إجراءات سريعة' : 'Quick Actions'}
+            </Text>
           </View>
-        )}
+        </View>
+        <View style={styles.quickActionsGrid}>
+          {[
+            { icon: Globe, label: language === 'ar' ? 'إضافة دولة' : 'Add Country', onPress: handleAddCountry, color: '#6366F1' },
+            { icon: FileText, label: language === 'ar' ? 'إضافة قانون' : 'Add Law', onPress: handleAddLaw, color: '#10B981' },
+            { icon: Tag, label: language === 'ar' ? 'إضافة فئة' : 'Add Category', onPress: handleAddCategory, color: '#F59E0B' },
+            { icon: SettingsIcon, label: language === 'ar' ? 'الإعدادات' : 'Settings', onPress: () => setActiveTab('settings'), color: '#EC4899' },
+          ].map((action, index) => (
+            <TouchableOpacity
+              key={index} 
+              style={[styles.quickActionItem, { backgroundColor: action.color + '10' }]}
+              onPress={action.onPress}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.quickActionIcon, { backgroundColor: action.color + '20' }]}>
+                <action.icon size={20} color={action.color} />
+              </View>
+              <Text style={[styles.quickActionLabel, { color: theme.text }]} numberOfLines={1}>
+                {action.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
 
-        {activeTab === 'laws' && (
-          <View style={styles.section}>
-            <View style={[styles.sectionHeader, isRTL && styles.rtl]}>
-              <Text style={styles.sectionTitle}>{t.manageLaws}</Text>
-              <TouchableOpacity style={[styles.addButton, { backgroundColor: theme.primary }]} onPress={handleAddLaw}>
-                <Plus size={20} color="#fff" />
-                <Text style={styles.addButtonText}>{t.add}</Text>
+      {/* Activity Overview */}
+      <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
+        <View style={[styles.sectionCardHeader, isRTL && styles.rtl]}>
+          <View style={[styles.sectionTitleRow, isRTL && styles.rtl]}>
+            <Activity size={20} color={theme.primary} />
+            <Text style={[styles.sectionCardTitle, { color: theme.text }]}>
+              {language === 'ar' ? 'نظرة عامة' : 'Activity Overview'}
+              </Text>
+          </View>
+        </View>
+        <View style={styles.activityList}>
+          <View style={[styles.activityItem, isRTL && styles.rtl]}>
+            <View style={[styles.activityIconContainer, { backgroundColor: '#10B98120' }]}>
+              <CheckCircle size={18} color="#10B981" />
+            </View>
+            <View style={[styles.activityInfo, isRTL && { alignItems: 'flex-end' }]}>
+              <Text style={[styles.activityTitle, { color: theme.text }]}>
+                {language === 'ar' ? 'المستخدمين النشطين' : 'Active Users'}
+              </Text>
+              <Text style={[styles.activityValue, { color: '#10B981' }]}>{activeUsers}</Text>
+            </View>
+          </View>
+          <View style={[styles.activityItem, isRTL && styles.rtl]}>
+            <View style={[styles.activityIconContainer, { backgroundColor: '#6366F120' }]}>
+              <MessageSquare size={18} color="#6366F1" />
+            </View>
+            <View style={[styles.activityInfo, isRTL && { alignItems: 'flex-end' }]}>
+              <Text style={[styles.activityTitle, { color: theme.text }]}>
+                {language === 'ar' ? 'رسائل جديدة' : 'Unread Messages'}
+              </Text>
+              <Text style={[styles.activityValue, { color: '#6366F1' }]}>{unreadMessages}</Text>
+            </View>
+          </View>
+          <View style={[styles.activityItem, isRTL && styles.rtl]}>
+            <View style={[styles.activityIconContainer, { backgroundColor: '#EF444420' }]}>
+              <Ban size={18} color="#EF4444" />
+            </View>
+            <View style={[styles.activityInfo, isRTL && { alignItems: 'flex-end' }]}>
+              <Text style={[styles.activityTitle, { color: theme.text }]}>
+                {language === 'ar' ? 'المحظورين' : 'Banned Users'}
+              </Text>
+              <Text style={[styles.activityValue, { color: '#EF4444' }]}>{bannedUsers}</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* Recent Messages */}
+      {contactMessages.length > 0 && (
+        <View style={[styles.sectionCard, { backgroundColor: theme.card }]}>
+          <View style={[styles.sectionCardHeader, isRTL && styles.rtl]}>
+            <View style={[styles.sectionTitleRow, isRTL && styles.rtl]}>
+              <Mail size={20} color={theme.primary} />
+              <Text style={[styles.sectionCardTitle, { color: theme.text }]}>
+                {language === 'ar' ? 'آخر الرسائل' : 'Recent Messages'}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={() => setActiveTab('contact')}>
+              <Text style={[styles.seeAllText, { color: theme.primary }]}>
+                {language === 'ar' ? 'عرض الكل' : 'See All'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          {contactMessages.slice(0, 3).map((msg) => (
+            <TouchableOpacity
+              key={msg.id} 
+              style={[styles.messagePreviewItem, isRTL && styles.rtl]}
+              onPress={() => setActiveTab('contact')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.messageAvatar, { backgroundColor: msg.status === 'unread' ? theme.primary : theme.backgroundSecondary }]}>
+                <Text style={[styles.messageAvatarText, { color: msg.status === 'unread' ? '#fff' : theme.text }]}>
+                  {msg.name.charAt(0).toUpperCase()}
+              </Text>
+              </View>
+              <View style={[styles.messagePreviewContent, isRTL && { alignItems: 'flex-end' }]}>
+                <View style={[styles.messagePreviewHeader, isRTL && styles.rtl]}>
+                  <Text style={[styles.messagePreviewName, { color: theme.text }]} numberOfLines={1}>
+                    {msg.name}
+              </Text>
+                  {msg.status === 'unread' && (
+                    <View style={[styles.unreadDot, { backgroundColor: theme.primary }]} />
+                  )}
+          </View>
+                <Text style={[styles.messagePreviewSubject, { color: theme.textSecondary, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
+                  {msg.subject}
+                </Text>
+      </View>
+              <ChevronRight size={18} color={theme.textSecondary} style={isRTL && { transform: [{ rotate: '180deg' }] }} />
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+
+  const renderCountries = () => (
+    <View style={styles.listContainer}>
+      <View style={[styles.listHeader, isRTL && styles.rtl]}>
+        <Text style={[styles.listTitle, { color: theme.text }]}>{t.manageCountries}</Text>
+        <TouchableOpacity 
+          style={[styles.addBtn, { backgroundColor: theme.primary }]} 
+          onPress={handleAddCountry}
+        >
+          <Plus size={18} color="#fff" />
+          <Text style={styles.addBtnText}>{t.add}</Text>
               </TouchableOpacity>
             </View>
 
-            {laws.map(law => (
-              <View key={law.id} style={styles.card}>
-                <View style={[styles.cardHeader, isRTL && styles.rtl]}>
-                  <View style={[styles.cardTitle, isRTL && styles.rtl]}>
-                    <View style={styles.lawInfo}>
-                      <Text style={[styles.cardTitleText, isRTL && styles.rtl]} numberOfLines={2}>
+      {countries.length === 0 ? (
+        <View style={[styles.emptyState, { backgroundColor: theme.card }]}>
+          <Globe size={48} color={theme.textSecondary} />
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>
+            {language === 'ar' ? 'لا توجد دول' : 'No Countries Yet'}
+          </Text>
+          <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
+            {language === 'ar' ? 'أضف دولة للبدء' : 'Add a country to get started'}
+          </Text>
+                    </View>
+      ) : (
+        countries.map((country) => (
+          <View 
+            key={country.id} 
+            style={[
+              styles.listItem,
+              { backgroundColor: theme.card }
+            ]}
+          >
+            <View style={[styles.listItemContent, isRTL && styles.rtl]}>
+              <FlagDisplay flag={country.flag} size="medium" />
+              <View style={[styles.listItemInfo, isRTL && { alignItems: 'flex-end' }]}>
+                <Text style={[styles.listItemTitle, { color: theme.text }]}>
+                  {getTranslatedName(country)}
+                </Text>
+                <Text style={[styles.listItemSubtitle, { color: theme.textSecondary }]}>
+                  {country.lawCount} {t.laws}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.listItemActions}>
+              <TouchableOpacity
+                style={[styles.actionIconBtn, { backgroundColor: theme.primary + '15' }]}
+                onPress={() => handleEditCountry(country)}
+              >
+                <Edit size={16} color={theme.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionIconBtn, { backgroundColor: '#EF444415' }]}
+                onPress={() => handleDeleteCountry(country)}
+              >
+                <Trash2 size={16} color="#EF4444" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))
+      )}
+          </View>
+  );
+
+  const renderLaws = () => (
+    <View style={styles.listContainer}>
+      <View style={[styles.listHeader, isRTL && styles.rtl]}>
+        <Text style={[styles.listTitle, { color: theme.text }]}>{t.manageLaws}</Text>
+        <TouchableOpacity 
+          style={[styles.addBtn, { backgroundColor: theme.primary }]} 
+          onPress={handleAddLaw}
+        >
+          <Plus size={18} color="#fff" />
+          <Text style={styles.addBtnText}>{t.add}</Text>
+              </TouchableOpacity>
+            </View>
+
+      {laws.length === 0 ? (
+        <View style={[styles.emptyState, { backgroundColor: theme.card }]}>
+          <FileText size={48} color={theme.textSecondary} />
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>
+            {language === 'ar' ? 'لا توجد قوانين' : 'No Laws Yet'}
+          </Text>
+          <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
+            {language === 'ar' ? 'أضف قانون للبدء' : 'Add a law to get started'}
+          </Text>
+        </View>
+      ) : (
+        laws.map((law) => (
+          <View key={law.id} style={[styles.listItem, { backgroundColor: theme.card }]}>
+            <View style={[styles.listItemContent, isRTL && styles.rtl, { flex: 1 }]}>
+              <View style={[styles.lawIconContainer, { backgroundColor: theme.primary + '15' }]}>
+                <FileText size={20} color={theme.primary} />
+              </View>
+              <View style={[styles.listItemInfo, isRTL && { alignItems: 'flex-end' }, { flex: 1 }]}>
+                <Text style={[styles.listItemTitle, { color: theme.text }]} numberOfLines={2}>
                         {law.title}
                       </Text>
                       <View style={[styles.lawBadges, isRTL && styles.rtl]}>
-                        <View style={styles.badge}>
-                          <Text style={styles.badgeText}>{getCountryName(law.countryId)}</Text>
+                  <View style={[styles.lawBadge, { backgroundColor: '#6366F115' }]}>
+                    <Text style={[styles.lawBadgeText, { color: '#6366F1' }]}>
+                      {getCountryName(law.countryId)}
+                    </Text>
                         </View>
-                        <View style={styles.badge}>
-                          <Text style={styles.badgeText}>{getCategoryName(law.categoryId)}</Text>
+                  <View style={[styles.lawBadge, { backgroundColor: '#10B98115' }]}>
+                    <Text style={[styles.lawBadgeText, { color: '#10B981' }]}>
+                      {getCategoryName(law.categoryId)}
+                    </Text>
                         </View>
                       </View>
                     </View>
                   </View>
-                  <View style={styles.cardActions}>
+            <View style={styles.listItemActions}>
                     <TouchableOpacity
-                      style={styles.iconButton}
+                style={[styles.actionIconBtn, { backgroundColor: theme.primary + '15' }]}
                       onPress={() => handleEditLaw(law)}
                     >
-                      <Edit size={18} color={theme.primary} />
+                <Edit size={16} color={theme.primary} />
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={styles.iconButton}
+                style={[styles.actionIconBtn, { backgroundColor: '#EF444415' }]}
                       onPress={() => handleDeleteLaw(law)}
                     >
-                      <Trash2 size={18} color={Colors.light.error} />
+                <Trash2 size={16} color="#EF4444" />
                     </TouchableOpacity>
                   </View>
                 </View>
-              </View>
-            ))}
+        ))
+      )}
           </View>
-        )}
+  );
 
-        {activeTab === 'categories' && (
-          <View style={styles.section}>
-            <View style={[styles.sectionHeader, isRTL && styles.rtl]}>
-              <Text style={styles.sectionTitle}>{t.manageCategories}</Text>
-              <TouchableOpacity style={[styles.addButton, { backgroundColor: theme.primary }]} onPress={handleAddCategory}>
-                <Plus size={20} color="#fff" />
-                <Text style={styles.addButtonText}>{t.add}</Text>
+  const renderCategories = () => (
+    <View style={styles.listContainer}>
+      <View style={[styles.listHeader, isRTL && styles.rtl]}>
+        <Text style={[styles.listTitle, { color: theme.text }]}>{t.manageCategories}</Text>
+        <TouchableOpacity 
+          style={[styles.addBtn, { backgroundColor: theme.primary }]} 
+          onPress={handleAddCategory}
+        >
+          <Plus size={18} color="#fff" />
+          <Text style={styles.addBtnText}>{t.add}</Text>
               </TouchableOpacity>
             </View>
 
-            {categories.map(category => (
-              <View key={category.id} style={styles.card}>
-                <View style={[styles.cardHeader, isRTL && styles.rtl]}>
-                  <View style={[styles.cardTitle, isRTL && styles.rtl]}>
-                    <View style={styles.categoryIcon}>
+      {categories.length === 0 ? (
+        <View style={[styles.emptyState, { backgroundColor: theme.card }]}>
+          <Tag size={48} color={theme.textSecondary} />
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>
+            {language === 'ar' ? 'لا توجد فئات' : 'No Categories Yet'}
+          </Text>
+          <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
+            {language === 'ar' ? 'أضف فئة للبدء' : 'Add a category to get started'}
+          </Text>
+        </View>
+      ) : (
+        categories.map((category) => (
+          <View key={category.id} style={[styles.listItem, { backgroundColor: theme.card }]}>
+            <View style={[styles.listItemContent, isRTL && styles.rtl]}>
+              <View style={[styles.categoryIcon, { backgroundColor: theme.primary + '15' }]}>
                       <Tag size={20} color={theme.primary} />
                     </View>
-                    <View>
-                      <Text style={[styles.cardTitleText, isRTL && styles.rtl]}>{category.name}</Text>
-                      <Text style={[styles.cardSubtext, isRTL && styles.rtl]}>Icon: {category.icon}</Text>
+              <View style={[styles.listItemInfo, isRTL && { alignItems: 'flex-end' }]}>
+                <Text style={[styles.listItemTitle, { color: theme.text }]}>
+                  {getTranslatedName(category)}
+                </Text>
+                <Text style={[styles.listItemSubtitle, { color: theme.textSecondary }]}>
+                  {language === 'ar' ? 'أيقونة:' : 'Icon:'} {category.icon}
+                </Text>
                     </View>
                   </View>
-                  <View style={styles.cardActions}>
+            <View style={styles.listItemActions}>
                     <TouchableOpacity
-                      style={styles.iconButton}
+                style={[styles.actionIconBtn, { backgroundColor: theme.primary + '15' }]}
                       onPress={() => handleEditCategory(category)}
                     >
-                      <Edit size={18} color={theme.primary} />
+                <Edit size={16} color={theme.primary} />
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={styles.iconButton}
+                style={[styles.actionIconBtn, { backgroundColor: '#EF444415' }]}
                       onPress={() => handleDeleteCategory(category)}
                     >
-                      <Trash2 size={18} color={Colors.light.error} />
+                <Trash2 size={16} color="#EF4444" />
                     </TouchableOpacity>
                   </View>
                 </View>
-              </View>
-            ))}
-          </View>
+        ))
         )}
-
-        {activeTab === 'settings' && (
-          <View style={styles.section}>
-            <View style={[styles.sectionHeader, isRTL && styles.rtl]}>
-              <Text style={styles.sectionTitle}>Platform Settings</Text>
             </View>
+  );
 
-            <View style={styles.settingsCard}>
-              <View style={styles.settingHeader}>
-                <Palette size={24} color={theme.primary} />
-                <Text style={styles.settingTitle}>Brand Colors</Text>
+  const renderUsers = () => (
+    <View style={styles.listContainer}>
+      <View style={[styles.listHeader, isRTL && styles.rtl]}>
+        <Text style={[styles.listTitle, { color: theme.text }]}>{t.manageUsers}</Text>
+        <View style={[styles.userStats, isRTL && styles.rtl]}>
+          <View style={[styles.userStatBadge, { backgroundColor: '#10B98120' }]}>
+            <Text style={[styles.userStatText, { color: '#10B981' }]}>{activeUsers} {language === 'ar' ? 'نشط' : 'active'}</Text>
               </View>
-              <View style={styles.colorGrid}>
-                <View style={styles.colorItem}>
-                  <Text style={styles.colorLabel}>Primary Color</Text>
-                  <View style={styles.colorPreview}>
-                    <View style={[styles.colorBox, { backgroundColor: settings.primaryColor }]} />
-                    <Text style={styles.colorValue}>{settings.primaryColor}</Text>
-                  </View>
-                </View>
-                <View style={styles.colorItem}>
-                  <Text style={styles.colorLabel}>Secondary Color</Text>
-                  <View style={styles.colorPreview}>
-                    <View style={[styles.colorBox, { backgroundColor: settings.secondaryColor }]} />
-                    <Text style={styles.colorValue}>{settings.secondaryColor}</Text>
-                  </View>
-                </View>
-                <View style={styles.colorItem}>
-                  <Text style={styles.colorLabel}>Accent Color</Text>
-                  <View style={styles.colorPreview}>
-                    <View style={[styles.colorBox, { backgroundColor: settings.accentColor }]} />
-                    <Text style={styles.colorValue}>{settings.accentColor}</Text>
-                  </View>
+          <View style={[styles.userStatBadge, { backgroundColor: '#EF444420' }]}>
+            <Text style={[styles.userStatText, { color: '#EF4444' }]}>{bannedUsers} {language === 'ar' ? 'محظور' : 'banned'}</Text>
                 </View>
               </View>
             </View>
 
-            <View style={styles.settingsCard}>
-              <View style={styles.settingHeader}>
-                <ImageIcon size={24} color={theme.primary} />
-                <Text style={styles.settingTitle}>Branding</Text>
-              </View>
-              <View style={styles.settingItem}>
-                <Text style={styles.settingLabel}>App Name</Text>
-                <Text style={styles.settingValue}>{settings.appName}</Text>
-              </View>
-              <View style={styles.settingItem}>
-                <Text style={styles.settingLabel}>Description</Text>
-                <Text style={styles.settingValue}>{settings.appDescription}</Text>
-              </View>
-              <View style={styles.settingItem}>
-                <Text style={styles.settingLabel}>Footer Text</Text>
-                <Text style={styles.settingValue}>{settings.footerText}</Text>
-              </View>
-            </View>
-
-            <View style={styles.settingsCard}>
-              <View style={styles.settingHeader}>
-                <ImageIcon size={24} color={theme.primary} />
-                <Text style={styles.settingTitle}>App Icon & Logo</Text>
-              </View>
-              
-              <View style={styles.logoSection}>
-                <View style={styles.logoItem}>
-                  <Text style={styles.colorLabel}>App Logo</Text>
-                  <View style={styles.logoPreviewContainer}>
-                    {settings.logo ? (
+      {users.map((user) => (
+        <View key={user.id} style={[styles.userCard, { backgroundColor: theme.card }]}>
+          <View style={[styles.userCardHeader, isRTL && styles.rtl]}>
+            {user.avatar ? (
                       <Image
-                        source={{ uri: settings.logo }}
-                        style={styles.logoPreview}
-                        contentFit="contain"
+                source={{ uri: user.avatar }}
+                style={styles.userAvatarImg}
+                contentFit="cover"
                       />
                     ) : (
-                      <View style={styles.logoPlaceholder}>
-                        <ImageIcon size={32} color={Colors.light.textSecondary} />
-                        <Text style={styles.logoPlaceholderText}>No logo</Text>
+              <View style={[styles.userAvatarPlaceholder, { backgroundColor: user.role === 'admin' ? theme.primary : theme.secondary }]}>
+                <Text style={styles.userAvatarLetter}>
+                  {user.name.charAt(0).toUpperCase()}
+                </Text>
                       </View>
                     )}
+            <View style={[styles.userInfo, isRTL && { alignItems: 'flex-end' }]}>
+              <View style={[styles.userNameRow, isRTL && styles.rtl]}>
+                <Text style={[styles.userName, { color: theme.text }]}>{user.name}</Text>
+                {user.role === 'admin' && (
+                  <View style={[styles.roleBadge, { backgroundColor: theme.primary }]}>
+                    <Shield size={10} color="#fff" />
+                    <Text style={styles.roleBadgeText}>{t.admin.toUpperCase()}</Text>
                   </View>
-                  <TouchableOpacity
-                    style={[styles.uploadButton, { backgroundColor: theme.primary }]}
-                    onPress={() => {
-                      setUploadType('logo');
-                      setPhotoPickerVisible(true);
-                    }}
-                  >
-                    <ImageIcon size={16} color="#fff" />
-                    <Text style={styles.uploadButtonText}>
-                      {settings.logo ? 'Change Logo' : 'Upload Logo'}
+                )}
+              </View>
+              <Text style={[styles.userEmail, { color: theme.textSecondary }]}>{user.email}</Text>
+              <View style={[styles.userMeta, isRTL && styles.rtl]}>
+                <Text style={[styles.userMetaText, { color: theme.textSecondary }]}>
+                  {t.level}: {user.level}
                     </Text>
-                  </TouchableOpacity>
+                <Text style={[styles.userMetaDot, { color: theme.textSecondary }]}>•</Text>
+                <Text style={[styles.userMetaText, { color: theme.textSecondary }]}>
+                  {user.reputation} {t.reputation}
+                </Text>
                 </View>
-
-                <View style={styles.logoItem}>
-                  <Text style={styles.colorLabel}>Favicon</Text>
-                  <View style={styles.faviconPreviewContainer}>
-                    {settings.favicon ? (
-                      <Image
-                        source={{ uri: settings.favicon }}
-                        style={styles.faviconPreview}
-                        contentFit="contain"
-                      />
-                    ) : (
-                      <View style={styles.faviconPlaceholder}>
-                        <ImageIcon size={16} color={Colors.light.textSecondary} />
                       </View>
-                    )}
+          </View>
+          <View style={[styles.userCardFooter, isRTL && styles.rtl]}>
+            <View style={[
+              styles.statusBadge, 
+              { backgroundColor: user.status === 'active' ? '#10B98120' : user.status === 'banned' ? '#EF444420' : '#F59E0B20' }
+            ]}>
+              {user.status === 'active' ? (
+                <CheckCircle size={12} color="#10B981" />
+              ) : user.status === 'banned' ? (
+                <Ban size={12} color="#EF4444" />
+              ) : (
+                <AlertCircle size={12} color="#F59E0B" />
+              )}
+              <Text style={[
+                styles.statusText, 
+                { color: user.status === 'active' ? '#10B981' : user.status === 'banned' ? '#EF4444' : '#F59E0B' }
+              ]}>
+                {user.status === 'active' ? (language === 'ar' ? 'نشط' : 'Active') : 
+                 user.status === 'banned' ? (language === 'ar' ? 'محظور' : 'Banned') : 
+                 (language === 'ar' ? 'معلق' : 'Suspended')}
+              </Text>
                   </View>
                   <TouchableOpacity
-                    style={[styles.uploadButton, { backgroundColor: theme.primary }]}
+              style={[styles.manageBtn, { backgroundColor: theme.primary }]}
                     onPress={() => {
-                      setUploadType('favicon');
-                      setPhotoPickerVisible(true);
+                setEditingUser(user);
+                setUserModalVisible(true);
                     }}
                   >
-                    <ImageIcon size={16} color="#fff" />
-                    <Text style={styles.uploadButtonText}>
-                      {settings.favicon ? 'Change Favicon' : 'Upload Favicon'}
-                    </Text>
+              <UserCog size={16} color="#fff" />
+              <Text style={styles.manageBtnText}>{language === 'ar' ? 'إدارة' : 'Manage'}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
+      ))}
             </View>
+  );
 
-            <View style={styles.settingsCard}>
-              <View style={styles.settingHeader}>
-                <Mail size={24} color={theme.primary} />
-                <Text style={styles.settingTitle}>Contact & Email</Text>
-              </View>
-              <View style={styles.settingItem}>
-                <Text style={styles.settingLabel}>Support Email</Text>
-                <Text style={styles.settingValue}>{settings.supportEmail}</Text>
-              </View>
-              {settings.smtpHost && (
-                <View style={styles.settingItem}>
-                  <Text style={styles.settingLabel}>SMTP Configured</Text>
-                  <View style={styles.badgeSuccess}>
-                    <Text style={styles.badgeText}>Active</Text>
-                  </View>
+  const renderContact = () => (
+    <View style={styles.listContainer}>
+      <View style={[styles.listHeader, isRTL && styles.rtl]}>
+        <Text style={[styles.listTitle, { color: theme.text }]}>
+          {language === 'ar' ? 'رسائل التواصل' : 'Contact Messages'}
+        </Text>
+        {unreadMessages > 0 && (
+          <View style={[styles.unreadBadge, { backgroundColor: theme.primary }]}>
+            <Text style={styles.unreadBadgeText}>{unreadMessages} {language === 'ar' ? 'جديد' : 'new'}</Text>
                 </View>
               )}
             </View>
 
-            <View style={styles.settingsCard}>
-              <View style={styles.settingHeader}>
-                <Globe size={24} color={theme.primary} />
-                <Text style={styles.settingTitle}>SEO Settings</Text>
-              </View>
-              <View style={styles.settingItem}>
-                <Text style={styles.settingLabel}>SEO Title</Text>
-                <Text style={styles.settingValue}>{settings.seoTitle}</Text>
-              </View>
-              <View style={styles.settingItem}>
-                <Text style={styles.settingLabel}>SEO Description</Text>
-                <Text style={styles.settingValue}>{settings.seoDescription}</Text>
-              </View>
-              <View style={styles.settingItem}>
-                <Text style={styles.settingLabel}>Keywords</Text>
-                <Text style={styles.settingValue}>{settings.seoKeywords}</Text>
-              </View>
-            </View>
-
-            <View style={styles.settingsCard}>
-              <View style={styles.settingHeader}>
-                <Shield size={24} color={theme.primary} />
-                <Text style={styles.settingTitle}>System Settings</Text>
-              </View>
-              <View style={styles.settingItem}>
-                <Text style={styles.settingLabel}>Maintenance Mode</Text>
-                <View style={settings.maintenanceMode ? styles.badgeError : styles.badgeSuccess}>
-                  <Text style={styles.badgeText}>{settings.maintenanceMode ? 'ON' : 'OFF'}</Text>
-                </View>
-              </View>
-              <View style={styles.settingItem}>
-                <Text style={styles.settingLabel}>User Registration</Text>
-                <View style={settings.allowRegistration ? styles.badgeSuccess : styles.badgeError}>
-                  <Text style={styles.badgeText}>{settings.allowRegistration ? 'Enabled' : 'Disabled'}</Text>
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.settingsActions}>
-              <TouchableOpacity style={[styles.editSettingsButton, { backgroundColor: theme.primary }]} onPress={() => setSettingsModalVisible(true)}>
-                <Edit size={20} color="#fff" />
-                <Text style={styles.editSettingsButtonText}>Edit Global Settings</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={[styles.editSettingsButton, { backgroundColor: theme.secondary }]} onPress={() => setLanguageSettingsModalVisible(true)}>
-                <Languages size={20} color="#fff" />
-                <Text style={styles.editSettingsButtonText}>Edit Language Settings</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
-        {activeTab === 'contact' && (
-          <View style={styles.section}>
-            <View style={[styles.sectionHeader, isRTL && styles.rtl]}>
-              <Text style={styles.sectionTitle}>Contact Messages</Text>
-            </View>
-
             {contactMessages.length === 0 ? (
-              <View style={[styles.emptyState, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <View style={[styles.emptyState, { backgroundColor: theme.card }]}>
                 <Mail size={48} color={theme.textSecondary} />
-                <Text style={[styles.emptyStateText, { color: theme.text }]}>No messages yet</Text>
-                <Text style={[styles.emptyStateSubtext, { color: theme.textSecondary }]}>
-                  Messages from the contact form will appear here
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>
+            {language === 'ar' ? 'لا توجد رسائل' : 'No Messages Yet'}
+          </Text>
+          <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
+            {language === 'ar' ? 'الرسائل ستظهر هنا' : 'Messages will appear here'}
                 </Text>
               </View>
             ) : (
-              contactMessages.map(msg => (
-                <View key={msg.id} style={[styles.card, { borderLeftWidth: 3, borderLeftColor: msg.status === 'unread' ? theme.primary : theme.border }]}>
-                  <View style={styles.messageHeader}>
-                    <View style={{ flex: 1 }}>
-                      <View style={styles.messageMetaRow}>
-                        <Text style={[styles.messageSender, { color: theme.text }]}>{msg.name}</Text>
+        contactMessages.map((msg) => (
+          <View 
+            key={msg.id} 
+            style={[
+              styles.messageCard, 
+              { backgroundColor: theme.card },
+              msg.status === 'unread' && { borderLeftWidth: 4, borderLeftColor: theme.primary }
+            ]}
+          >
+            <View style={[styles.messageCardHeader, isRTL && styles.rtl]}>
+              <View style={[styles.messageSenderInfo, isRTL && styles.rtl]}>
+                <View style={[styles.messageSenderAvatar, { backgroundColor: msg.status === 'unread' ? theme.primary : theme.backgroundSecondary }]}>
+                  <Text style={[styles.messageSenderInitial, { color: msg.status === 'unread' ? '#fff' : theme.text }]}>
+                    {msg.name.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                <View style={isRTL && { alignItems: 'flex-end' }}>
+                  <View style={[styles.messageSenderRow, isRTL && styles.rtl]}>
+                    <Text style={[styles.messageSenderName, { color: theme.text }]}>{msg.name}</Text>
                         {msg.status === 'unread' && (
-                          <View style={[styles.unreadBadge, { backgroundColor: theme.primary }]}>
-                            <Text style={styles.unreadBadgeText}>NEW</Text>
+                      <View style={[styles.newBadge, { backgroundColor: theme.primary }]}>
+                        <Text style={styles.newBadgeText}>{language === 'ar' ? 'جديد' : 'NEW'}</Text>
                           </View>
                         )}
                         {msg.status === 'replied' && (
-                          <View style={[styles.repliedBadge, { backgroundColor: theme.success }]}>
-                            <Text style={styles.repliedBadgeText}>REPLIED</Text>
+                      <View style={[styles.repliedBadge, { backgroundColor: '#10B981' }]}>
+                        <Text style={styles.repliedBadgeText}>{language === 'ar' ? 'تم الرد' : 'REPLIED'}</Text>
                           </View>
                         )}
                       </View>
-                      <Text style={[styles.messageEmail, { color: theme.textSecondary }]}>{msg.email}</Text>
-                      <Text style={[styles.messageSubject, { color: theme.text }]}>{msg.subject}</Text>
+                  <Text style={[styles.messageSenderEmail, { color: theme.textSecondary }]}>{msg.email}</Text>
+                </View>
+              </View>
                       <Text style={[styles.messageDate, { color: theme.textSecondary }]}>
-                        {new Date(msg.createdAt).toLocaleString()}
+                {new Date(msg.createdAt).toLocaleDateString()}
                       </Text>
                     </View>
-                  </View>
-                  <Text style={[styles.messageContent, { color: theme.text }]}>{msg.message}</Text>
+
+            <Text style={[styles.messageSubject, { color: theme.text, textAlign: isRTL ? 'right' : 'left' }]}>
+              {msg.subject}
+            </Text>
+            <Text style={[styles.messageBody, { color: theme.textSecondary, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={2}>
+              {msg.message}
+            </Text>
+
                   {msg.adminReply && (
-                    <View style={[styles.replyContainer, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
-                      <Text style={[styles.replyLabel, { color: theme.textSecondary }]}>Your Reply:</Text>
-                      <Text style={[styles.replyText, { color: theme.text }]}>{msg.adminReply}</Text>
-                      <Text style={[styles.replyDate, { color: theme.textSecondary }]}>
-                        Replied on {new Date(msg.repliedAt!).toLocaleString()}
+              <View style={[styles.replyPreview, { backgroundColor: theme.backgroundSecondary }]}>
+                <Text style={[styles.replyPreviewLabel, { color: theme.textSecondary }]}>
+                  {language === 'ar' ? 'ردك:' : 'Your Reply:'}
+                </Text>
+                <Text style={[styles.replyPreviewText, { color: theme.text, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={2}>
+                  {msg.adminReply}
                       </Text>
                     </View>
                   )}
-                  <View style={styles.messageActions}>
+
+            <View style={[styles.messageActions, isRTL && styles.rtl]}>
                     {msg.status === 'unread' && (
                       <TouchableOpacity
-                        style={[styles.actionButton, { backgroundColor: theme.primary }]}
+                  style={[styles.msgActionBtn, { backgroundColor: theme.primary + '15' }]}
                         onPress={() => markAsRead(msg.id)}
                       >
-                        <Text style={styles.actionButtonText}>Mark as Read</Text>
+                  <Eye size={14} color={theme.primary} />
+                  <Text style={[styles.msgActionText, { color: theme.primary }]}>
+                    {language === 'ar' ? 'تحديد كمقروء' : 'Mark Read'}
+                  </Text>
                       </TouchableOpacity>
                     )}
                     <TouchableOpacity
-                      style={[styles.actionButton, { backgroundColor: theme.secondary }]}
+                style={[styles.msgActionBtn, { backgroundColor: '#10B98115' }]}
                       onPress={() => {
                         Alert.prompt(
-                          'Reply to Message',
-                          `Reply to ${msg.name}:`,
+                    language === 'ar' ? 'الرد على الرسالة' : 'Reply to Message',
+                    `${language === 'ar' ? 'الرد على' : 'Reply to'} ${msg.name}:`,
                           [
-                            { text: 'Cancel', style: 'cancel' },
+                      { text: t.cancel, style: 'cancel' },
                             {
-                              text: 'Send Reply',
+                        text: language === 'ar' ? 'إرسال' : 'Send',
                               onPress: async (text: string | undefined) => {
                                 if (text && text.trim()) {
                                   await replyToMessage(msg.id, text.trim());
-                                  Alert.alert('Success', 'Reply sent successfully');
+                            Alert.alert(t.success, language === 'ar' ? 'تم إرسال الرد' : 'Reply sent');
                                 }
                               },
                             },
@@ -719,113 +838,370 @@ export default function AdminScreen() {
                         );
                       }}
                     >
-                      <Text style={styles.actionButtonText}>
-                        {msg.adminReply ? 'Update Reply' : 'Reply'}
+                <Mail size={14} color="#10B981" />
+                <Text style={[styles.msgActionText, { color: '#10B981' }]}>
+                  {msg.adminReply ? (language === 'ar' ? 'تحديث الرد' : 'Update') : (language === 'ar' ? 'رد' : 'Reply')}
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.actionButton, { backgroundColor: Colors.light.error }]}
+                style={[styles.msgActionBtn, { backgroundColor: '#EF444415' }]}
                       onPress={() => {
                         Alert.alert(
-                          'Delete Message',
-                          'Are you sure you want to delete this message?',
+                    language === 'ar' ? 'حذف الرسالة' : 'Delete Message',
+                    language === 'ar' ? 'هل أنت متأكد من حذف هذه الرسالة؟' : 'Are you sure you want to delete this message?',
                           [
-                            { text: 'Cancel', style: 'cancel' },
+                      { text: t.cancel, style: 'cancel' },
                             {
-                              text: 'Delete',
+                        text: t.delete,
                               style: 'destructive',
                               onPress: async () => {
                                 await deleteContactMessage(msg.id);
-                                Alert.alert('Success', 'Message deleted');
                               },
                             },
                           ]
                         );
                       }}
                     >
-                      <Trash2 size={16} color="#fff" />
+                <Trash2 size={14} color="#EF4444" />
                     </TouchableOpacity>
                   </View>
                 </View>
               ))
             )}
           </View>
-        )}
+  );
 
-        {activeTab === 'users' && (
-          <View style={styles.section}>
-            <View style={[styles.sectionHeader, isRTL && styles.rtl]}>
-              <Text style={styles.sectionTitle}>{t.manageUsers}</Text>
+  const renderSettings = () => (
+    <View style={styles.listContainer}>
+      <View style={[styles.listHeader, isRTL && styles.rtl]}>
+        <Text style={[styles.listTitle, { color: theme.text }]}>
+          {language === 'ar' ? 'إعدادات المنصة' : 'Platform Settings'}
+        </Text>
             </View>
 
-            {users.map(user => (
-              <View key={user.id} style={styles.card}>
-                <View style={[styles.cardHeader, isRTL && styles.rtl]}>
-                  <View style={[styles.cardTitle, isRTL && styles.rtl]}>
-                    {user.avatar ? (
-                      <Image
-                        source={{ uri: user.avatar }}
-                        style={styles.userAvatarImage}
-                        contentFit="cover"
-                      />
-                    ) : (
-                      <View
-                        style={[
-                          styles.userAvatar,
-                          { backgroundColor: user.role === 'admin' ? theme.primary : theme.secondary },
-                        ]}
-                      >
-                        <Text style={styles.userAvatarText}>
-                          {user.name.charAt(0).toUpperCase()}
+      {/* Brand Colors */}
+      <View style={[styles.settingsSection, { backgroundColor: theme.card }]}>
+        <View style={[styles.settingsSectionHeader, isRTL && styles.rtl]}>
+          <Palette size={22} color={theme.primary} />
+          <Text style={[styles.settingsSectionTitle, { color: theme.text }]}>
+            {language === 'ar' ? 'ألوان العلامة التجارية' : 'Brand Colors'}
+          </Text>
+        </View>
+        <View style={styles.colorRow}>
+          {[
+            { label: language === 'ar' ? 'الأساسي' : 'Primary', value: settings.primaryColor },
+            { label: language === 'ar' ? 'الثانوي' : 'Secondary', value: settings.secondaryColor },
+            { label: language === 'ar' ? 'التمييز' : 'Accent', value: settings.accentColor },
+          ].map((color) => (
+            <View key={color.label} style={styles.colorItem}>
+              <View style={[styles.colorPreviewBox, { backgroundColor: color.value }]} />
+              <Text style={[styles.colorLabel, { color: theme.textSecondary }]}>{color.label}</Text>
+              <Text style={[styles.colorValue, { color: theme.text }]}>{color.value}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* App Branding */}
+      <View style={[styles.settingsSection, { backgroundColor: theme.card }]}>
+        <View style={[styles.settingsSectionHeader, isRTL && styles.rtl]}>
+          <Languages size={22} color={theme.primary} />
+          <Text style={[styles.settingsSectionTitle, { color: theme.text }]}>
+            {language === 'ar' ? 'هوية التطبيق' : 'App Branding'}
+          </Text>
+        </View>
+        
+        {/* English */}
+        <View style={styles.brandingLang}>
+          <Text style={[styles.brandingLangTitle, { color: theme.text }]}>🇬🇧 English</Text>
+          <View style={styles.brandingInputGroup}>
+            <Text style={[styles.brandingLabel, { color: theme.textSecondary }]}>App Name</Text>
+            <TextInput
+              style={[styles.brandingInput, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
+              value={settings.languageSettings?.en?.appName || settings.appName}
+              onChangeText={(text) => updateLanguageSettings('en', { appName: text })}
+              placeholder="App name in English"
+              placeholderTextColor={theme.textSecondary}
+            />
+          </View>
+          <View style={styles.brandingInputGroup}>
+            <Text style={[styles.brandingLabel, { color: theme.textSecondary }]}>Description</Text>
+            <TextInput
+              style={[styles.brandingInput, styles.brandingTextarea, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
+              value={settings.languageSettings?.en?.appDescription || settings.appDescription}
+              onChangeText={(text) => updateLanguageSettings('en', { appDescription: text })}
+              placeholder="App description"
+              placeholderTextColor={theme.textSecondary}
+              multiline
+            />
+          </View>
+        </View>
+
+        {/* Arabic */}
+        <View style={styles.brandingLang}>
+          <Text style={[styles.brandingLangTitle, { color: theme.text, textAlign: 'right' }]}>🇸🇦 العربية</Text>
+          <View style={styles.brandingInputGroup}>
+            <Text style={[styles.brandingLabel, { color: theme.textSecondary, textAlign: 'right' }]}>اسم التطبيق</Text>
+            <TextInput
+              style={[styles.brandingInput, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border, textAlign: 'right' }]}
+              value={settings.languageSettings?.ar?.appName || ''}
+              onChangeText={(text) => updateLanguageSettings('ar', { appName: text })}
+              placeholder="اسم التطبيق بالعربية"
+              placeholderTextColor={theme.textSecondary}
+            />
+          </View>
+          <View style={styles.brandingInputGroup}>
+            <Text style={[styles.brandingLabel, { color: theme.textSecondary, textAlign: 'right' }]}>الوصف</Text>
+            <TextInput
+              style={[styles.brandingInput, styles.brandingTextarea, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border, textAlign: 'right' }]}
+              value={settings.languageSettings?.ar?.appDescription || ''}
+              onChangeText={(text) => updateLanguageSettings('ar', { appDescription: text })}
+              placeholder="وصف التطبيق بالعربية"
+              placeholderTextColor={theme.textSecondary}
+              multiline
+            />
+          </View>
+        </View>
+      </View>
+
+      {/* Logo & Favicon */}
+      <View style={[styles.settingsSection, { backgroundColor: theme.card }]}>
+        <View style={[styles.settingsSectionHeader, isRTL && styles.rtl]}>
+          <ImageIcon size={22} color={theme.primary} />
+          <Text style={[styles.settingsSectionTitle, { color: theme.text }]}>
+            {language === 'ar' ? 'الشعار والأيقونة' : 'Logo & Favicon'}
+          </Text>
+        </View>
+        
+        <View style={styles.logoRow}>
+          <View style={styles.logoUploadItem}>
+            <Text style={[styles.logoUploadLabel, { color: theme.textSecondary }]}>
+              {language === 'ar' ? 'شعار التطبيق' : 'App Logo'}
+            </Text>
+            <View style={[styles.logoPreviewContainer, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
+              {settings.logo ? (
+                <Image source={{ uri: settings.logo }} style={styles.logoPreviewImg} contentFit="contain" />
+              ) : (
+                <ImageIcon size={32} color={theme.textSecondary} />
+              )}
+            </View>
+            <TouchableOpacity
+              style={[styles.uploadBtn, { backgroundColor: theme.primary }]}
+              onPress={() => {
+                setUploadType('logo');
+                setPhotoPickerVisible(true);
+              }}
+            >
+              <ImageIcon size={16} color="#fff" />
+              <Text style={styles.uploadBtnText}>
+                {settings.logo ? (language === 'ar' ? 'تغيير' : 'Change') : (language === 'ar' ? 'رفع' : 'Upload')}
                         </Text>
+            </TouchableOpacity>
                       </View>
-                    )}
-                    <View style={{ flex: 1 }}>
-                      <View style={styles.userNameRow}>
-                        <Text style={[styles.cardTitleText, isRTL && styles.rtl]}>{user.name}</Text>
-                        {user.role === 'admin' && (
-                          <View style={[styles.adminBadge, { backgroundColor: theme.primary }]}>
-                            <Shield size={10} color="#fff" />
-                            <Text style={styles.adminBadgeText}>{t.admin.toUpperCase()}</Text>
+
+          <View style={styles.logoUploadItem}>
+            <Text style={[styles.logoUploadLabel, { color: theme.textSecondary }]}>
+              {language === 'ar' ? 'الأيقونة المفضلة' : 'Favicon'}
+            </Text>
+            <View style={[styles.faviconPreviewContainer, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
+              {settings.favicon ? (
+                <Image source={{ uri: settings.favicon }} style={styles.faviconPreviewImg} contentFit="contain" />
+              ) : (
+                <ImageIcon size={20} color={theme.textSecondary} />
+              )}
                           </View>
-                        )}
-                        {user.status === 'banned' && (
-                          <View style={[styles.bannedBadge, { backgroundColor: Colors.light.error }]}>
-                            <Ban size={10} color="#fff" />
-                            <Text style={styles.bannedBadgeText}>BANNED</Text>
+            <TouchableOpacity
+              style={[styles.uploadBtn, { backgroundColor: theme.primary }]}
+              onPress={() => {
+                setUploadType('favicon');
+                setPhotoPickerVisible(true);
+              }}
+            >
+              <ImageIcon size={16} color="#fff" />
+              <Text style={styles.uploadBtnText}>
+                {settings.favicon ? (language === 'ar' ? 'تغيير' : 'Change') : (language === 'ar' ? 'رفع' : 'Upload')}
+              </Text>
+            </TouchableOpacity>
                           </View>
-                        )}
-                        {user.status === 'suspended' && (
-                          <View style={[styles.suspendedBadge, { backgroundColor: Colors.light.warning }]}>
-                            <Text style={styles.suspendedBadgeText}>SUSPENDED</Text>
+        </View>
+      </View>
+
+      {/* System Settings */}
+      <View style={[styles.settingsSection, { backgroundColor: theme.card }]}>
+        <View style={[styles.settingsSectionHeader, isRTL && styles.rtl]}>
+          <Shield size={22} color={theme.primary} />
+          <Text style={[styles.settingsSectionTitle, { color: theme.text }]}>
+            {language === 'ar' ? 'إعدادات النظام' : 'System Settings'}
+          </Text>
+        </View>
+        
+        <View style={styles.systemSettingsList}>
+          <View style={[styles.systemSettingItem, isRTL && styles.rtl]}>
+            <Text style={[styles.systemSettingLabel, { color: theme.text }]}>
+              {language === 'ar' ? 'وضع الصيانة' : 'Maintenance Mode'}
+            </Text>
+            <View style={[styles.systemSettingStatus, { backgroundColor: settings.maintenanceMode ? '#EF444420' : '#10B98120' }]}>
+              {settings.maintenanceMode ? (
+                <XCircle size={14} color="#EF4444" />
+              ) : (
+                <CheckCircle size={14} color="#10B981" />
+              )}
+              <Text style={[styles.systemSettingStatusText, { color: settings.maintenanceMode ? '#EF4444' : '#10B981' }]}>
+                {settings.maintenanceMode ? 'ON' : 'OFF'}
+              </Text>
                           </View>
-                        )}
+          </View>
+          <View style={[styles.systemSettingItem, isRTL && styles.rtl]}>
+            <Text style={[styles.systemSettingLabel, { color: theme.text }]}>
+              {language === 'ar' ? 'تسجيل المستخدمين' : 'User Registration'}
+            </Text>
+            <View style={[styles.systemSettingStatus, { backgroundColor: settings.allowRegistration ? '#10B98120' : '#EF444420' }]}>
+              {settings.allowRegistration ? (
+                <CheckCircle size={14} color="#10B981" />
+              ) : (
+                <XCircle size={14} color="#EF4444" />
+              )}
+              <Text style={[styles.systemSettingStatusText, { color: settings.allowRegistration ? '#10B981' : '#EF4444' }]}>
+                {settings.allowRegistration ? (language === 'ar' ? 'مفعل' : 'Enabled') : (language === 'ar' ? 'معطل' : 'Disabled')}
+              </Text>
                       </View>
-                      <Text style={[styles.cardSubtext, isRTL && styles.rtl]}>{user.email}</Text>
-                      <Text style={[styles.cardSubtext, isRTL && styles.rtl]}>
-                        {t.level}: {user.level} • {user.reputation} {t.reputation}
+          </View>
+          <View style={[styles.systemSettingItem, isRTL && styles.rtl]}>
+            <Text style={[styles.systemSettingLabel, { color: theme.text }]}>
+              {language === 'ar' ? 'البريد الإلكتروني' : 'Support Email'}
                       </Text>
-                      <Text style={[styles.cardSubtext, isRTL && styles.rtl]}>
-                        Joined: {new Date(user.joinedDate).toLocaleDateString()}
+            <Text style={[styles.systemSettingValue, { color: theme.textSecondary }]}>
+              {settings.supportEmail}
                       </Text>
                     </View>
                   </View>
+      </View>
+
+      {/* Action Buttons */}
+      <View style={styles.settingsActions}>
                   <TouchableOpacity
-                    style={[styles.manageButton, { backgroundColor: theme.primary }]}
-                    onPress={() => {
-                      setEditingUser(user);
-                      setUserModalVisible(true);
-                    }}
+          style={[styles.settingsActionBtn, { backgroundColor: theme.primary }]}
+          onPress={() => setSettingsModalVisible(true)}
+        >
+          <Edit size={18} color="#fff" />
+          <Text style={styles.settingsActionBtnText}>
+            {language === 'ar' ? 'تحرير الإعدادات' : 'Edit Settings'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.settingsActionBtn, { backgroundColor: theme.secondary }]}
+          onPress={() => setLanguageSettingsModalVisible(true)}
                   >
-                    <UserCog size={18} color="#fff" />
+          <Languages size={18} color="#fff" />
+          <Text style={styles.settingsActionBtnText}>
+            {language === 'ar' ? 'إعدادات اللغة' : 'Language Settings'}
+          </Text>
                   </TouchableOpacity>
                 </View>
               </View>
-            ))}
+  );
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'dashboard':
+        return renderDashboard();
+      case 'countries':
+        return renderCountries();
+      case 'laws':
+        return renderLaws();
+      case 'categories':
+        return renderCategories();
+      case 'users':
+        return renderUsers();
+      case 'contact':
+        return renderContact();
+      case 'settings':
+        return renderSettings();
+      default:
+        return renderDashboard();
+    }
+  };
+
+  return (
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      {/* Header */}
+      <LinearGradient
+        colors={[theme.primary, theme.secondary]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
+        <View style={[styles.headerContent, isRTL && styles.rtl]}>
+          <View style={isRTL && { alignItems: 'flex-end' }}>
+            <Text style={styles.headerTitle}>
+              {language === 'ar' ? 'لوحة الإدارة' : 'Admin Panel'}
+            </Text>
+            <Text style={styles.headerSubtitle}>
+              {language === 'ar' ? 'إدارة المحتوى والمستخدمين' : 'Manage content & users'}
+            </Text>
+          </View>
+          <View style={[styles.headerStats, isRTL && styles.rtl]}>
+            <View style={styles.headerStatItem}>
+              <Text style={styles.headerStatValue}>{laws.length}</Text>
+              <Text style={styles.headerStatLabel}>{language === 'ar' ? 'قانون' : 'Laws'}</Text>
+            </View>
+            <View style={styles.headerStatDivider} />
+            <View style={styles.headerStatItem}>
+              <Text style={styles.headerStatValue}>{users.length}</Text>
+              <Text style={styles.headerStatLabel}>{language === 'ar' ? 'مستخدم' : 'Users'}</Text>
+            </View>
+          </View>
+        </View>
+      </LinearGradient>
+
+      {/* Navigation */}
+      <View style={[styles.navContainer, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.navScroll}>
+          {NAV_ITEMS.map((item) => {
+            const isActive = activeTab === item.id;
+            const IconComponent = item.icon;
+            const unreadCount = item.id === 'contact' ? unreadMessages : 0;
+            
+            return (
+              <TouchableOpacity
+                key={item.id}
+                style={[
+                  styles.navItem,
+                  isActive && [styles.navItemActive, { backgroundColor: theme.primary }]
+                ]}
+                onPress={() => setActiveTab(item.id)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.navItemInner}>
+                  <IconComponent size={18} color={isActive ? '#fff' : theme.textSecondary} />
+                  <Text style={[
+                    styles.navItemText,
+                    { color: isActive ? '#fff' : theme.textSecondary }
+                  ]}>
+                    {language === 'ar' ? item.labelAr : item.label}
+                  </Text>
+                  {unreadCount > 0 && (
+                    <View style={styles.navBadge}>
+                      <Text style={styles.navBadgeText}>{unreadCount}</Text>
           </View>
         )}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+      </ScrollView>
+      </View>
+
+      {/* Content */}
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.contentInner}
+      >
+        {renderContent()}
       </ScrollView>
 
+      {/* Modals */}
       <CountryFormModal
         visible={countryModalVisible}
         onClose={() => setCountryModalVisible(false)}
@@ -884,516 +1260,834 @@ export default function AdminScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.backgroundSecondary,
   },
   header: {
-    backgroundColor: Colors.light.background,
-    paddingTop: 16,
+    paddingTop: Platform.OS === 'ios' ? 0 : 10,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: -0.5,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 4,
+  },
+  headerStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 12,
+    paddingVertical: 10,
     paddingHorizontal: 16,
-    paddingBottom: 12,
+  },
+  headerStatItem: {
+    alignItems: 'center',
+  },
+  headerStatValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  headerStatLabel: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 2,
+  },
+  headerStatDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    marginHorizontal: 16,
+  },
+  navContainer: {
     borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+  },
+  navScroll: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  navItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginRight: 8,
+  },
+  navItemActive: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  navItemInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  navItemText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  navBadge: {
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 4,
+  },
+  navBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  content: {
+    flex: 1,
+  },
+  contentInner: {
+    paddingBottom: 100,
+  },
+  rtl: {
+    flexDirection: 'row-reverse',
+  },
+
+  // Dashboard
+  dashboardContainer: {
+    padding: 16,
+    gap: 16,
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
-    marginBottom: 16,
   },
   statCard: {
-    flex: 1,
-    minWidth: '45%',
-    backgroundColor: Colors.light.backgroundSecondary,
+    width: (SCREEN_WIDTH - 44) / 2,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.light.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: '700' as const,
-    color: Colors.light.text,
-    marginTop: 8,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: Colors.light.textSecondary,
-    marginTop: 4,
-  },
-  tabs: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  tab: {
-    flexDirection: 'row',
+  statIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.light.backgroundSecondary,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    gap: 6,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
+    marginBottom: 12,
   },
-  activeTab: {},
-  tabText: {
+  statValue: {
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: -1,
+  },
+  statLabel: {
     fontSize: 13,
-    fontWeight: '600' as const,
-    color: Colors.light.text,
+    fontWeight: '500',
+    marginTop: 4,
   },
-  activeTabText: {
-    color: '#fff',
-  },
-  content: {
-    flex: 1,
-  },
-  section: {
+  sectionCard: {
+    borderRadius: 16,
     padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  sectionHeader: {
+  sectionCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
   },
-  rtl: {
-    flexDirection: 'row-reverse',
-    textAlign: 'right',
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700' as const,
-    color: Colors.light.text,
-  },
-  addButton: {
+  sectionTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 6,
+    gap: 10,
   },
-  addButtonText: {
-    color: '#fff',
+  sectionCardTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  seeAllText: {
     fontSize: 14,
-    fontWeight: '600' as const,
+    fontWeight: '600',
   },
-  card: {
-    backgroundColor: Colors.light.card,
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  quickActionItem: {
+    width: (SCREEN_WIDTH - 64) / 2,
+    padding: 14,
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  cardTitle: {
-    flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
-    gap: 12,
+    gap: 10,
   },
-  countryFlag: {
-    fontSize: 32,
-  },
-  categoryIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.light.backgroundSecondary,
+  quickActionIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cardTitleText: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-    color: Colors.light.text,
-    marginBottom: 4,
-  },
-  cardSubtext: {
+  quickActionLabel: {
     fontSize: 13,
-    color: Colors.light.textSecondary,
+    fontWeight: '600',
+    textAlign: 'center',
   },
-  cardActions: {
+  activityList: {
+    gap: 12,
+  },
+  activityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  activityIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activityInfo: {
+    flex: 1,
+  },
+  activityTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  activityValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  messagePreviewItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+    gap: 12,
+  },
+  messageAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  messageAvatarText: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  messagePreviewContent: {
+    flex: 1,
+  },
+  messagePreviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  messagePreviewName: {
+    fontSize: 15,
+    fontWeight: '600',
+    flex: 1,
+  },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  messagePreviewSubject: {
+    fontSize: 13,
+    marginTop: 3,
+  },
+
+  // List Containers
+  listContainer: {
+    padding: 16,
+  },
+  listHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  listTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 6,
+  },
+  addBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  listItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderRadius: 14,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  listItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  listItemInfo: {
+    gap: 4,
+  },
+  listItemTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  listItemSubtitle: {
+    fontSize: 13,
+  },
+  listItemActions: {
     flexDirection: 'row',
     gap: 8,
   },
-  iconButton: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: Colors.light.backgroundSecondary,
+  actionIconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  lawInfo: {
-    flex: 1,
+  lawIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   lawBadges: {
     flexDirection: 'row',
-    gap: 6,
+    gap: 8,
     marginTop: 8,
   },
-  badge: {
-    backgroundColor: Colors.light.backgroundSecondary,
-    paddingHorizontal: 8,
+  lawBadge: {
+    paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 6,
   },
-  badgeText: {
+  lawBadgeText: {
     fontSize: 11,
-    color: Colors.light.text,
+    fontWeight: '600',
   },
-  userAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  categoryIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  userAvatarImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  emptyState: {
+    padding: 48,
+    borderRadius: 16,
+    alignItems: 'center',
+    gap: 12,
   },
-  userAvatarText: {
-    fontSize: 16,
-    fontWeight: '600' as const,
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+
+  // Users
+  userStats: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  userStatBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  userStatText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  userCard: {
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  userCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 14,
+  },
+  userAvatarImg: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  userAvatarPlaceholder: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userAvatarLetter: {
+    fontSize: 20,
+    fontWeight: '700',
     color: '#fff',
+  },
+  userInfo: {
+    flex: 1,
   },
   userNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 4,
+    flexWrap: 'wrap',
   },
-  adminBadge: {
+  userName: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  userEmail: {
+    fontSize: 13,
+    marginTop: 3,
+  },
+  userMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+    marginTop: 6,
+    gap: 6,
+  },
+  userMetaText: {
+    fontSize: 12,
+  },
+  userMetaDot: {
+    fontSize: 12,
+  },
+  roleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
     gap: 4,
   },
-  adminBadgeText: {
+  roleBadgeText: {
     fontSize: 9,
-    fontWeight: '700' as const,
+    fontWeight: '700',
     color: '#fff',
   },
-  noAccessContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-    backgroundColor: Colors.light.backgroundSecondary,
-  },
-  noAccessTitle: {
-    fontSize: 24,
-    fontWeight: '700' as const,
-    color: Colors.light.text,
-    marginTop: 16,
-  },
-  noAccessText: {
-    fontSize: 16,
-    color: Colors.light.textSecondary,
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  settingsCard: {
-    backgroundColor: Colors.light.card,
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
-  },
-  settingHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
-  },
-  settingTitle: {
-    fontSize: 18,
-    fontWeight: '700' as const,
-    color: Colors.light.text,
-  },
-  settingItem: {
+  userCardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.backgroundSecondary,
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
   },
-  settingLabel: {
-    fontSize: 14,
-    fontWeight: '500' as const,
-    color: Colors.light.textSecondary,
-    flex: 1,
-  },
-  settingValue: {
-    fontSize: 14,
-    color: Colors.light.text,
-    flex: 2,
-    textAlign: 'right',
-  },
-  colorGrid: {
-    gap: 16,
-  },
-  colorItem: {
-    gap: 8,
-  },
-  colorLabel: {
-    fontSize: 14,
-    fontWeight: '500' as const,
-    color: Colors.light.textSecondary,
-  },
-  colorPreview: {
+  statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-  },
-  colorBox: {
-    width: 40,
-    height: 40,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
+    gap: 5,
   },
-  colorValue: {
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  manageBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 6,
+  },
+  manageBtnText: {
+    color: '#fff',
     fontSize: 13,
-    fontFamily: 'monospace',
-    color: Colors.light.text,
+    fontWeight: '600',
   },
-  badgeSuccess: {
-    backgroundColor: Colors.light.success,
+
+  // Contact Messages
+  unreadBadge: {
     paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  badgeError: {
-    backgroundColor: Colors.light.error,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  settingsActions: {
-    gap: 12,
-    marginTop: 8,
-  },
-  editSettingsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 12,
-    gap: 8,
-  },
-  editSettingsButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600' as const,
-  },
-  bannedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    gap: 4,
-  },
-  bannedBadgeText: {
-    fontSize: 9,
-    fontWeight: '700' as const,
-    color: '#fff',
-  },
-  suspendedBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  suspendedBadgeText: {
-    fontSize: 9,
-    fontWeight: '700' as const,
-    color: '#fff',
-  },
-  manageButton: {
-    padding: 10,
+    paddingVertical: 5,
     borderRadius: 8,
   },
-  logoSection: {
-    gap: 20,
-  },
-  logoItem: {
-    gap: 12,
-  },
-  logoPreviewContainer: {
-    width: '100%',
-    height: 120,
-    backgroundColor: Colors.light.backgroundSecondary,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
-    overflow: 'hidden',
-  },
-  logoPreview: {
-    width: '100%',
-    height: '100%',
-  },
-  logoPlaceholder: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  logoPlaceholderText: {
-    fontSize: 13,
-    color: Colors.light.textSecondary,
-  },
-  faviconPreviewContainer: {
-    width: 64,
-    height: 64,
-    backgroundColor: Colors.light.backgroundSecondary,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
-    overflow: 'hidden',
-  },
-  faviconPreview: {
-    width: '100%',
-    height: '100%',
-  },
-  faviconPlaceholder: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  uploadButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    gap: 8,
-  },
-  uploadButtonText: {
+  unreadBadgeText: {
     color: '#fff',
-    fontSize: 14,
-    fontWeight: '600' as const,
+    fontSize: 12,
+    fontWeight: '600',
   },
-  emptyState: {
-    padding: 48,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1,
+  messageCard: {
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  emptyStateText: {
-    fontSize: 18,
-    fontWeight: '600' as const,
-    marginTop: 16,
-  },
-  emptyStateSubtext: {
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  messageHeader: {
+  messageCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     marginBottom: 12,
   },
-  messageMetaRow: {
+  messageSenderInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  messageSenderAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  messageSenderInitial: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  messageSenderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 4,
   },
-  messageSender: {
-    fontSize: 16,
-    fontWeight: '700' as const,
+  messageSenderName: {
+    fontSize: 15,
+    fontWeight: '600',
   },
-  messageEmail: {
-    fontSize: 13,
-    marginBottom: 4,
+  messageSenderEmail: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  messageDate: {
+    fontSize: 11,
+  },
+  newBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  newBadgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  repliedBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  repliedBadgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '700',
   },
   messageSubject: {
     fontSize: 15,
-    fontWeight: '600' as const,
-    marginTop: 4,
+    fontWeight: '600',
+    marginBottom: 6,
   },
-  messageDate: {
-    fontSize: 12,
-    marginTop: 4,
+  messageBody: {
+    fontSize: 13,
+    lineHeight: 20,
   },
-  messageContent: {
-    fontSize: 14,
-    lineHeight: 22,
-    marginVertical: 12,
+  replyPreview: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 10,
+  },
+  replyPreviewLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  replyPreviewText: {
+    fontSize: 13,
+    lineHeight: 18,
   },
   messageActions: {
     flexDirection: 'row',
     gap: 8,
-    marginTop: 12,
+    marginTop: 14,
     flexWrap: 'wrap',
   },
-  actionButton: {
+  msgActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 6,
+  },
+  msgActionText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  // Settings
+  settingsSection: {
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  settingsSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 18,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  settingsSectionTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  colorRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  colorItem: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  colorPreviewBox: {
+    width: 50,
+    height: 50,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  colorLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  colorValue: {
+    fontSize: 11,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  brandingLang: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
+  },
+  brandingLangTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 14,
+  },
+  brandingInputGroup: {
+    marginBottom: 12,
+  },
+  brandingLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginBottom: 6,
+  },
+  brandingInput: {
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    borderWidth: 1,
+  },
+  brandingTextarea: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  logoRow: {
+    flexDirection: 'row',
+    gap: 20,
+  },
+  logoUploadItem: {
+    flex: 1,
+    gap: 10,
+  },
+  logoUploadLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  logoPreviewContainer: {
+    height: 100,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  logoPreviewImg: {
+    width: '100%',
+    height: '100%',
+  },
+  faviconPreviewContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  faviconPreviewImg: {
+    width: '100%',
+    height: '100%',
+  },
+  uploadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 10,
     borderRadius: 8,
     gap: 6,
   },
-  actionButtonText: {
+  uploadBtnText: {
     color: '#fff',
     fontSize: 13,
-    fontWeight: '600' as const,
+    fontWeight: '600',
   },
-  unreadBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+  systemSettingsList: {
+    gap: 12,
   },
-  unreadBadgeText: {
-    fontSize: 10,
-    fontWeight: '700' as const,
-    color: '#fff',
+  systemSettingItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.03)',
   },
-  repliedBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  repliedBadgeText: {
-    fontSize: 10,
-    fontWeight: '700' as const,
-    color: '#fff',
-  },
-  replyContainer: {
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    marginTop: 12,
-  },
-  replyLabel: {
-    fontSize: 12,
-    fontWeight: '600' as const,
-    marginBottom: 6,
-  },
-  replyText: {
+  systemSettingLabel: {
     fontSize: 14,
-    lineHeight: 20,
+    fontWeight: '500',
   },
-  replyDate: {
-    fontSize: 11,
-    marginTop: 6,
+  systemSettingStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    gap: 5,
+  },
+  systemSettingStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  systemSettingValue: {
+    fontSize: 13,
+  },
+  settingsActions: {
+    gap: 10,
+    marginTop: 4,
+  },
+  settingsActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+  },
+  settingsActionBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+
+  // No Access
+  noAccessContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noAccessGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '50%',
+  },
+  noAccessContent: {
+    alignItems: 'center',
+    padding: 32,
+  },
+  noAccessIcon: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  noAccessTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    marginBottom: 10,
+  },
+  noAccessText: {
+    fontSize: 15,
+    textAlign: 'center',
+    lineHeight: 22,
   },
 });

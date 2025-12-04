@@ -1,28 +1,63 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   FlatList,
+  Animated,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Bookmark, BookOpen, MessageCircle, ChevronRight, Sparkles } from 'lucide-react-native';
-import Colors from '@/constants/colors';
+import { 
+  BookOpen, 
+  MessageCircle, 
+  ChevronRight, 
+  Heart,
+  Trash2,
+  ThumbsUp,
+  MessageSquare,
+  Sparkles,
+} from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import HapticRefreshControl from '@/components/HapticRefreshControl';
 import { useData } from '@/contexts/DataContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useFavorites } from '@/contexts/FavoritesContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/hooks/useTheme';
+import FlagDisplay from '@/components/FlagDisplay';
 
 type TabType = 'laws' | 'questions';
 
 export default function FavoritesScreen() {
   const router = useRouter();
   const { laws, questions, countries, categories } = useData();
+  const { users } = useAuth();
   const { favorites, toggleLawFavorite, toggleQuestionFavorite } = useFavorites();
-  const { isRTL } = useLanguage();
+  const { isRTL, t, getTranslatedName } = useLanguage();
   const theme = useTheme();
   const [activeTab, setActiveTab] = useState<TabType>('laws');
+  const [refreshing, setRefreshing] = useState(false);
+  
+  // Animations
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
+  }, [fadeAnim]);
+
+  // Pull-to-refresh handler
+  const onRefresh = async () => {
+    setRefreshing(true);
+    // Simulate data refresh
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setRefreshing(false);
+  };
 
   const favoritedLaws = useMemo(() => {
     return laws.filter(law => favorites.laws.includes(law.id));
@@ -32,160 +67,246 @@ export default function FavoritesScreen() {
     return questions.filter(question => favorites.questions.includes(question.id));
   }, [questions, favorites.questions]);
 
-  const getCountryName = (countryId: string) => {
-    return countries.find(c => c.id === countryId)?.name || '';
+  const totalSaved = favoritedLaws.length + favoritedQuestions.length;
+
+  const getCountry = (countryId: string) => {
+    return countries.find(c => c.id === countryId);
   };
 
   const getCategoryName = (categoryId: string) => {
-    return categories.find(c => c.id === categoryId)?.name || '';
+    const category = categories.find(c => c.id === categoryId);
+    return category ? getTranslatedName(category) : '';
   };
 
-  const renderLawItem = ({ item }: { item: typeof laws[0] }) => (
-    <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border, shadowColor: theme.shadow }]}>
-      <TouchableOpacity
-        style={styles.cardContent}
-        activeOpacity={0.7}
-        onPress={() => router.push(`/(tabs)/law-detail?id=${item.id}`)}
+  const getUser = (userId: string) => {
+    return users.find(u => u.id === userId);
+  };
+
+  const renderLawItem = ({ item, index }: { item: typeof laws[0]; index: number }) => {
+    const itemAnim = new Animated.Value(0);
+    Animated.spring(itemAnim, {
+      toValue: 1,
+      tension: 50,
+      friction: 8,
+      delay: index * 50,
+      useNativeDriver: true,
+    }).start();
+    
+    return (
+      <Animated.View
+        style={{
+          opacity: itemAnim,
+          transform: [{ translateX: itemAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [-20, 0],
+          })}],
+        }}
       >
-        <View style={styles.cardHeader}>
-          <View style={[styles.badges, isRTL && styles.rtl]}>
-            <View style={[styles.countryBadge, { backgroundColor: theme.backgroundSecondary }]}>
-              <Text style={[styles.countryBadgeText, { color: theme.text }]}>
-                {countries.find(c => c.id === item.countryId)?.flag} {getCountryName(item.countryId)}
-              </Text>
+        <View style={[styles.listItem, { backgroundColor: theme.card }, isRTL && styles.listItemRTL]}>
+          <View style={[styles.statusLine, { backgroundColor: '#6366f1' }, isRTL && styles.statusLineRTL]} />
+          
+          <View style={styles.itemFlag}>
+            <FlagDisplay flag={getCountry(item.countryId)?.flag || '🌍'} size="medium" />
+          </View>
+          
+          <TouchableOpacity
+            style={styles.itemContent}
+            activeOpacity={0.8}
+            onPress={() => router.push(`/(tabs)/law-detail?id=${item.id}`)}
+          >
+            <View style={[styles.itemMeta, isRTL && styles.itemMetaRTL]}>
+              <FlagDisplay flag={getCountry(item.countryId)?.flag || '🌍'} size="small" />
+              <Text style={[styles.dot, { color: theme.textSecondary }]}>•</Text>
+              <Text style={[styles.itemCategory, { color: theme.secondary }]}>{getCategoryName(item.categoryId)}</Text>
             </View>
-            <View style={[styles.categoryBadge, { backgroundColor: theme.secondary }]}>
-              <Text style={styles.categoryBadgeText}>{getCategoryName(item.categoryId)}</Text>
-            </View>
+            <Text style={[styles.itemTitle, { color: theme.text }, isRTL && styles.textRTL]} numberOfLines={1}>
+              {item.title}
+            </Text>
+            <Text style={[styles.itemDate, { color: theme.textSecondary }, isRTL && styles.textRTL]}>
+              {new Date(item.lastUpdated).toLocaleDateString(isRTL ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric' })}
+            </Text>
+          </TouchableOpacity>
+          
+          <View style={[styles.itemActions, isRTL && styles.itemActionsRTL]}>
+            <TouchableOpacity
+              style={styles.removeBtn}
+              onPress={() => toggleLawFavorite(item.id)}
+            >
+              <Trash2 size={16} color="#ef4444" />
+            </TouchableOpacity>
+            <ChevronRight size={18} color={theme.textSecondary} style={isRTL ? { transform: [{ rotate: '180deg' }] } : {}} />
           </View>
         </View>
-        <Text style={[styles.cardTitle, { color: theme.text }, isRTL && styles.rtlText]}>{item.title}</Text>
-        <Text style={[styles.cardDescription, { color: theme.textSecondary }, isRTL && styles.rtlText]} numberOfLines={2}>
-          {item.description}
-        </Text>
-        <View style={[styles.cardFooter, isRTL && styles.rtl]}>
-          <Text style={[styles.cardMeta, { color: theme.textSecondary }, isRTL && styles.rtlText]}>
-            {new Date(item.lastUpdated).toLocaleDateString()}
-          </Text>
-          <ChevronRight size={20} color={theme.textSecondary} style={isRTL ? { transform: [{ rotate: '180deg' }] } : {}} />
-        </View>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.bookmarkButton}
-        onPress={() => toggleLawFavorite(item.id)}
-        activeOpacity={0.7}
-      >
-        <Bookmark
-          size={22}
-          color={theme.primary}
-          fill={theme.primary}
-        />
-      </TouchableOpacity>
-    </View>
-  );
+      </Animated.View>
+    );
+  };
 
-  const renderQuestionItem = ({ item }: { item: typeof questions[0] }) => (
-    <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border, shadowColor: theme.shadow }]}>
-      <TouchableOpacity
-        style={styles.cardContent}
-        activeOpacity={0.7}
-        onPress={() => router.push(`/(tabs)/question-detail?id=${item.id}`)}
+  const renderQuestionItem = ({ item, index }: { item: typeof questions[0]; index: number }) => {
+    const questionUser = getUser(item.userId);
+    const itemAnim = new Animated.Value(0);
+    Animated.spring(itemAnim, {
+      toValue: 1,
+      tension: 50,
+      friction: 8,
+      delay: index * 50,
+      useNativeDriver: true,
+    }).start();
+    
+    return (
+      <Animated.View
+        style={{
+          opacity: itemAnim,
+          transform: [{ translateX: itemAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [-20, 0],
+          })}],
+        }}
       >
-        <View style={[styles.questionBadges, isRTL && styles.rtl]}>
-          <Text style={styles.countryFlag}>
-            {countries.find(c => c.id === item.countryId)?.flag}
-          </Text>
-          {item.tags.slice(0, 2).map(tag => (
-            <View key={tag} style={[styles.tag, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
-              <Text style={[styles.tagText, { color: theme.text }]}>{tag}</Text>
-            </View>
-          ))}
-        </View>
-        <Text style={[styles.cardTitle, { color: theme.text }, isRTL && styles.rtlText]}>{item.title}</Text>
-        <Text style={[styles.cardDescription, { color: theme.textSecondary }, isRTL && styles.rtlText]} numberOfLines={2}>
-          {item.content}
-        </Text>
-        <View style={[styles.cardFooter, isRTL && styles.rtl]}>
-          <View style={[styles.questionStats, isRTL && styles.rtl]}>
-            <Text style={[styles.statText, { color: theme.textSecondary }]}>{item.votes} votes</Text>
-            <Text style={[styles.statText, { color: theme.textSecondary }]}>{item.answerCount} answers</Text>
+        <View style={[styles.listItem, { backgroundColor: theme.card }, isRTL && styles.listItemRTL]}>
+          <View style={[styles.statusLine, { backgroundColor: item.isResolved ? '#22c55e' : '#06b6d4' }, isRTL && styles.statusLineRTL]} />
+          
+          <View style={styles.itemAvatar}>
+            {questionUser?.avatar ? (
+              <Image source={{ uri: questionUser.avatar }} style={styles.avatarImg} />
+            ) : (
+              <View style={[styles.avatarImg, { backgroundColor: '#6366f1' }]}>
+                <Text style={styles.avatarText}>{questionUser?.name?.charAt(0) || '?'}</Text>
+              </View>
+            )}
           </View>
-          <ChevronRight size={20} color={theme.textSecondary} style={isRTL ? { transform: [{ rotate: '180deg' }] } : {}} />
+          
+          <TouchableOpacity
+            style={styles.itemContent}
+            activeOpacity={0.8}
+            onPress={() => router.push(`/(tabs)/question-detail?id=${item.id}`)}
+          >
+            <View style={[styles.itemMeta, isRTL && styles.itemMetaRTL]}>
+              <FlagDisplay flag={getCountry(item.countryId)?.flag || '🌍'} size="small" />
+              <Text style={[styles.dot, { color: theme.textSecondary }]}>•</Text>
+              <Text style={[styles.itemCategory, { color: '#06b6d4' }]}>{getCategoryName(item.categoryId)}</Text>
+            </View>
+            <Text style={[styles.itemTitle, { color: theme.text }, isRTL && styles.textRTL]} numberOfLines={1}>
+              {item.title}
+            </Text>
+            <View style={[styles.itemStats, isRTL && styles.itemStatsRTL]}>
+              <View style={styles.stat}>
+                <ThumbsUp size={12} color="#6366f1" />
+                <Text style={styles.statText}>{item.votes}</Text>
+              </View>
+              <View style={styles.stat}>
+                <MessageSquare size={12} color="#06b6d4" />
+                <Text style={[styles.statText, { color: '#06b6d4' }]}>{item.answerCount}</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+          
+          <View style={[styles.itemActions, isRTL && styles.itemActionsRTL]}>
+            <TouchableOpacity
+              style={styles.removeBtn}
+              onPress={() => toggleQuestionFavorite(item.id)}
+            >
+              <Trash2 size={16} color="#ef4444" />
+            </TouchableOpacity>
+            <ChevronRight size={18} color={theme.textSecondary} style={isRTL ? { transform: [{ rotate: '180deg' }] } : {}} />
+          </View>
         </View>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.bookmarkButton}
-        onPress={() => toggleQuestionFavorite(item.id)}
-        activeOpacity={0.7}
-      >
-        <Bookmark
-          size={22}
-          color={theme.primary}
-          fill={theme.primary}
-        />
-      </TouchableOpacity>
-    </View>
-  );
+      </Animated.View>
+    );
+  };
 
-  const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <Sparkles size={64} color={theme.primary} />
-      <Text style={[styles.emptyStateTitle, { color: theme.text }, isRTL && styles.rtlText]}>
-        No {activeTab === 'laws' ? 'Laws' : 'Questions'} Bookmarked
-      </Text>
-      <Text style={[styles.emptyStateText, { color: theme.textSecondary }, isRTL && styles.rtlText]}>
-        Start bookmarking {activeTab === 'laws' ? 'laws' : 'questions'} to see them here
-      </Text>
-    </View>
-  );
-
+  const renderEmptyState = () => {
+    const isLawsTab = activeTab === 'laws';
+    
+    return (
+      <View style={styles.emptyState}>
+        <LinearGradient
+          colors={isLawsTab ? ['#6366f1', '#8b5cf6'] : ['#06b6d4', '#22d3ee']}
+          style={styles.emptyIcon}
+        >
+          {isLawsTab ? (
+            <BookOpen size={32} color="#fff" />
+          ) : (
+            <MessageCircle size={32} color="#fff" />
+          )}
+        </LinearGradient>
+        <Text style={[styles.emptyTitle, { color: theme.text }, isRTL && styles.textRTL]}>
+          {isLawsTab ? t.noLawsSaved : t.noQuestionsSaved}
+        </Text>
+        <Text style={[styles.emptySubtitle, { color: theme.textSecondary }, isRTL && styles.textRTL]}>
+          {t.bookmarkToSave}
+        </Text>
+        <TouchableOpacity
+          style={styles.emptyBtn}
+          onPress={() => router.push(isLawsTab ? '/(tabs)/laws' : '/(tabs)/questions')}
+        >
+          <LinearGradient
+            colors={isLawsTab ? ['#6366f1', '#8b5cf6'] : ['#06b6d4', '#22d3ee']}
+            style={styles.emptyBtnGradient}
+          >
+            <Sparkles size={16} color="#fff" />
+            <Text style={styles.emptyBtnText}>
+              {isLawsTab ? t.browseLaws : t.browseQuestions}
+            </Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+  
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundSecondary }]}>
-      <View style={[styles.header, { backgroundColor: theme.background, borderBottomColor: theme.border }]}>
-        <View style={styles.tabsContainer}>
-          <TouchableOpacity
-            style={[
-              styles.tab,
-              { backgroundColor: theme.backgroundSecondary, borderColor: theme.border },
-              activeTab === 'laws' && [
-                styles.activeTab,
-                { backgroundColor: theme.primary, borderColor: theme.primary }
-              ]
-            ]}
-            onPress={() => setActiveTab('laws')}
-          >
-            <BookOpen size={20} color={activeTab === 'laws' ? '#fff' : theme.text} />
-            <Text style={[
-              styles.tabText,
-              activeTab === 'laws' && styles.activeTabText,
-              isRTL && styles.rtlText
-            ]}>
-              Laws ({favoritedLaws.length})
+      {/* Header */}
+      <Animated.View style={[styles.header, { backgroundColor: theme.background, opacity: fadeAnim }]}>
+        <View style={[styles.headerTop, isRTL && styles.headerTopRTL]}>
+          <View style={styles.headerIconBg}>
+            <Heart size={20} color="#ef4444" fill="#ef4444" />
+          </View>
+          <View>
+            <Text style={[styles.headerTitle, { color: theme.text }, isRTL && styles.textRTL]}>
+              {t.favorites}
             </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.tab,
-              { backgroundColor: theme.backgroundSecondary, borderColor: theme.border },
-              activeTab === 'questions' && [
-                styles.activeTab,
-                { backgroundColor: theme.primary, borderColor: theme.primary }
-              ]
-            ]}
-            onPress={() => setActiveTab('questions')}
-          >
-            <MessageCircle size={20} color={activeTab === 'questions' ? '#fff' : theme.text} />
-            <Text style={[
-              styles.tabText,
-              activeTab === 'questions' && styles.activeTabText,
-              isRTL && styles.rtlText
-            ]}>
-              Questions ({favoritedQuestions.length})
+            <Text style={[styles.headerSubtitle, { color: theme.textSecondary }, isRTL && styles.textRTL]}>
+              {totalSaved} {t.savedItems}
             </Text>
-          </TouchableOpacity>
+          </View>
         </View>
+        
+        {/* Quick Stats */}
+        <View style={[styles.quickStats, isRTL && styles.quickStatsRTL]}>
+          <View style={[styles.quickStatItem, { backgroundColor: '#eef2ff' }]}>
+            <BookOpen size={14} color="#6366f1" />
+            <Text style={[styles.quickStatText, { color: '#6366f1' }]}>{favoritedLaws.length}</Text>
+          </View>
+          <View style={[styles.quickStatItem, { backgroundColor: '#ecfeff' }]}>
+            <MessageCircle size={14} color="#06b6d4" />
+            <Text style={[styles.quickStatText, { color: '#06b6d4' }]}>{favoritedQuestions.length}</Text>
+          </View>
+        </View>
+      </Animated.View>
+
+      {/* Tabs */}
+      <View style={[styles.tabsContainer, { backgroundColor: theme.background }, isRTL && styles.tabsContainerRTL]}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'laws' && styles.tabActive]}
+          onPress={() => setActiveTab('laws')}
+        >
+          <BookOpen size={16} color={activeTab === 'laws' ? '#fff' : theme.textSecondary} />
+          <Text style={[styles.tabText, activeTab === 'laws' && styles.tabTextActive]}>
+            {t.laws}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'questions' && styles.tabActiveQ]}
+          onPress={() => setActiveTab('questions')}
+        >
+          <MessageCircle size={16} color={activeTab === 'questions' ? '#fff' : theme.textSecondary} />
+          <Text style={[styles.tabText, activeTab === 'questions' && styles.tabTextActive]}>
+            {t.qa}
+          </Text>
+        </TouchableOpacity>
       </View>
 
+      {/* Content */}
       {activeTab === 'laws' ? (
         <FlatList
           data={favoritedLaws}
@@ -193,6 +314,13 @@ export default function FavoritesScreen() {
           renderItem={renderLawItem}
           contentContainerStyle={styles.list}
           ListEmptyComponent={renderEmptyState}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <HapticRefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+            />
+          }
         />
       ) : (
         <FlatList
@@ -201,6 +329,13 @@ export default function FavoritesScreen() {
           renderItem={renderQuestionItem}
           contentContainerStyle={styles.list}
           ListEmptyComponent={renderEmptyState}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <HapticRefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+            />
+          }
         />
       )}
     </View>
@@ -210,173 +345,270 @@ export default function FavoritesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.backgroundSecondary,
   },
+  
+  // Header
   header: {
-    backgroundColor: Colors.light.background,
-    paddingTop: 16,
-    paddingHorizontal: 16,
+    padding: 16,
     paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
   },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  headerIconBg: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#fef2f2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  quickStats: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  quickStatItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  quickStatText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  
+  // Tabs
   tabsContainer: {
     flexDirection: 'row',
-    gap: 12,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    gap: 8,
   },
   tab: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.light.backgroundSecondary,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    gap: 8,
-    borderWidth: 1.5,
-    borderColor: Colors.light.border,
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: '#f1f5f9',
   },
-  activeTab: {
+  tabActive: {
+    backgroundColor: '#6366f1',
+  },
+  tabActiveQ: {
+    backgroundColor: '#06b6d4',
   },
   tabText: {
-    fontSize: 15,
-    fontWeight: '600' as const,
-    color: Colors.light.text,
-  },
-  activeTabText: {
-    color: '#fff',
-  },
-  list: {
-    padding: 16,
-    gap: 12,
-  },
-  card: {
-    backgroundColor: Colors.light.card,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
-    shadowColor: Colors.light.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 2,
-    flexDirection: 'row',
-  },
-  cardContent: {
-    flex: 1,
-    padding: 16,
-  },
-  cardHeader: {
-    marginBottom: 12,
-  },
-  badges: {
-    flexDirection: 'row',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  countryBadge: {
-    backgroundColor: Colors.light.backgroundSecondary,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-  countryBadgeText: {
-    fontSize: 12,
-    fontWeight: '600' as const,
-    color: Colors.light.text,
-  },
-  categoryBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-  categoryBadgeText: {
-    fontSize: 12,
-    fontWeight: '600' as const,
-    color: '#fff',
-  },
-  questionBadges: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-    alignItems: 'center',
-  },
-  countryFlag: {
-    fontSize: 20,
-  },
-  tag: {
-    backgroundColor: Colors.light.backgroundSecondary,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
-  },
-  tagText: {
-    fontSize: 11,
-    color: Colors.light.text,
-    fontWeight: '500' as const,
-  },
-  cardTitle: {
-    fontSize: 17,
-    fontWeight: '700' as const,
-    color: Colors.light.text,
-    marginBottom: 8,
-    lineHeight: 24,
-  },
-  cardDescription: {
     fontSize: 14,
-    color: Colors.light.textSecondary,
-    lineHeight: 20,
-    marginBottom: 12,
+    fontWeight: '600',
+    color: '#64748b',
   },
-  cardFooter: {
+  tabTextActive: {
+    color: '#fff',
+  },
+  
+  // List
+  list: {
+    padding: 12,
+    paddingBottom: 120,
+    gap: 8,
+  },
+  listItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  cardMeta: {
-    fontSize: 12,
-    color: Colors.light.textSecondary,
+  statusLine: {
+    width: 4,
+    height: '100%',
+    position: 'absolute',
+    left: 0,
   },
-  questionStats: {
+  itemFlag: {
+    paddingLeft: 12,
+    paddingRight: 8,
+    paddingVertical: 12,
+  },
+  flag: {
+    fontSize: 24,
+  },
+  itemAvatar: {
+    paddingLeft: 12,
+    paddingRight: 8,
+    paddingVertical: 12,
+  },
+  avatarImg: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  itemContent: {
+    flex: 1,
+    paddingVertical: 10,
+  },
+  itemMeta: {
     flexDirection: 'row',
-    gap: 16,
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 2,
+  },
+  itemFlag2: {
+    fontSize: 12,
+  },
+  itemCountry: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  itemFlagSmall: {
+    fontSize: 14,
+  },
+  itemCategory: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  dot: {
+    fontSize: 8,
+  },
+  itemTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 18,
+    marginBottom: 2,
+  },
+  itemDate: {
+    fontSize: 11,
+  },
+  itemStats: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 2,
+  },
+  stat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   statText: {
     fontSize: 12,
-    color: Colors.light.textSecondary,
-    fontWeight: '500' as const,
+    fontWeight: '700',
+    color: '#6366f1',
   },
-  bookmarkButton: {
-    padding: 16,
-    justifyContent: 'center',
+  itemActions: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
+    paddingRight: 12,
   },
+  removeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#fef2f2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  
+  // Empty State
   emptyState: {
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 80,
+    paddingVertical: 60,
     paddingHorizontal: 32,
   },
-  emptyStateTitle: {
-    fontSize: 20,
-    fontWeight: '700' as const,
-    color: Colors.light.text,
-    marginTop: 24,
-    marginBottom: 8,
+  emptyIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    shadowColor: '#6366f1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  emptyStateText: {
-    fontSize: 15,
-    color: Colors.light.textSecondary,
-    textAlign: 'center',
-    lineHeight: 22,
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 6,
   },
-  rtl: {
+  emptySubtitle: {
+    fontSize: 14,
+    marginBottom: 20,
+  },
+  emptyBtn: {
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  emptyBtnGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+  },
+  emptyBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  
+  // RTL Styles
+  listItemRTL: {
     flexDirection: 'row-reverse',
   },
-  rtlText: {
+  statusLineRTL: {
+    left: undefined,
+    right: 0,
+  },
+  itemMetaRTL: {
+    flexDirection: 'row-reverse',
+  },
+  itemStatsRTL: {
+    flexDirection: 'row-reverse',
+  },
+  itemActionsRTL: {
+    flexDirection: 'row-reverse',
+  },
+  textRTL: {
     textAlign: 'right',
+  },
+  headerTopRTL: {
+    flexDirection: 'row-reverse',
+  },
+  quickStatsRTL: {
+    flexDirection: 'row-reverse',
+  },
+  tabsContainerRTL: {
+    flexDirection: 'row-reverse',
   },
 });
