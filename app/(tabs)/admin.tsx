@@ -60,15 +60,16 @@ import { API_CONFIG } from '@/services/api';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-type AdminTab = 'dashboard' | 'countries' | 'laws' | 'categories' | 'users' | 'settings' | 'contact';
+type AdminTab = 'dashboard' | 'countries' | 'laws' | 'categories' | 'questions' | 'users' | 'settings' | 'contact';
 
 const NAV_ITEMS: { id: AdminTab; icon: any; label: string; labelAr: string }[] = [
   { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', labelAr: 'لوحة التحكم' },
   { id: 'countries', icon: Globe, label: 'Countries', labelAr: 'الدول' },
   { id: 'laws', icon: FileText, label: 'Laws', labelAr: 'القوانين' },
   { id: 'categories', icon: Tag, label: 'Categories', labelAr: 'الفئات' },
+  { id: 'questions', icon: MessageSquare, label: 'Q&A', labelAr: 'الأسئلة' },
   { id: 'users', icon: Users, label: 'Users', labelAr: 'المستخدمين' },
-  { id: 'contact', icon: MessageSquare, label: 'Messages', labelAr: 'الرسائل' },
+  { id: 'contact', icon: Mail, label: 'Messages', labelAr: 'الرسائل' },
   { id: 'settings', icon: SettingsIcon, label: 'Settings', labelAr: 'الإعدادات' },
 ];
 
@@ -81,10 +82,14 @@ export default function AdminScreen() {
   const { 
     countries, 
     laws, 
-    categories, 
+    categories,
+    questions,
+    answers,
     deleteCountry, 
     deleteLaw, 
     deleteCategory,
+    deleteQuestion,
+    deleteAnswer,
     addCountry,
     updateCountry,
     addLaw,
@@ -820,6 +825,124 @@ export default function AdminScreen() {
             </View>
   );
 
+  const renderQuestions = () => (
+    <View style={styles.listContainer}>
+      <View style={[styles.listHeader, isRTL && styles.rtl]}>
+        <Text style={[styles.listTitle, { color: theme.text }]}>
+          {language === 'ar' ? 'إدارة الأسئلة والأجوبة' : 'Manage Q&A'}
+        </Text>
+      </View>
+
+      {questions.length === 0 ? (
+        <View style={[styles.emptyState, { backgroundColor: theme.card }]}>
+          <MessageSquare size={48} color={theme.textSecondary} />
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>
+            {language === 'ar' ? 'لا توجد أسئلة' : 'No Questions Yet'}
+          </Text>
+        </View>
+      ) : (
+        questions.map((question) => {
+          const questionAnswers = answers.filter(a => a.questionId === question.id);
+          return (
+            <View 
+              key={question.id} 
+              style={[styles.listItem, { backgroundColor: theme.card }]}
+            >
+              <View style={styles.listItemContent}>
+                <View style={[styles.listItemHeader, isRTL && styles.rtl]}>
+                  <Text style={[styles.listItemTitle, { color: theme.text }]} numberOfLines={2}>
+                    {question.title}
+                  </Text>
+                  {question.isResolved && (
+                    <CheckCircle size={16} color={theme.success} />
+                  )}
+                </View>
+                <Text style={[styles.listItemSubtitle, { color: theme.textSecondary }]} numberOfLines={1}>
+                  {question.content}
+                </Text>
+                <View style={[styles.questionMeta, isRTL && styles.rtl]}>
+                  <Text style={[styles.metaText, { color: theme.textSecondary }]}>
+                    {questionAnswers.length} {language === 'ar' ? 'إجابة' : 'answers'}
+                  </Text>
+                  <Text style={[styles.metaText, { color: theme.textSecondary }]}>
+                    {question.votes} {language === 'ar' ? 'صوت' : 'votes'}
+                  </Text>
+                </View>
+                
+                {/* Answers List */}
+                {questionAnswers.length > 0 && (
+                  <View style={styles.answersContainer}>
+                    <Text style={[styles.answersTitle, { color: theme.text }]}>
+                      {language === 'ar' ? 'الإجابات:' : 'Answers:'}
+                    </Text>
+                    {questionAnswers.map((answer) => (
+                      <View key={answer.id} style={[styles.answerItem, { backgroundColor: theme.backgroundSecondary }]}>
+                        <Text style={[styles.answerText, { color: theme.text }]} numberOfLines={2}>
+                          {answer.content}
+                        </Text>
+                        <View style={[styles.answerActions, isRTL && styles.rtl]}>
+                          {answer.isAccepted && (
+                            <View style={[styles.acceptedBadge, { backgroundColor: theme.success + '20' }]}>
+                              <CheckCircle size={12} color={theme.success} />
+                              <Text style={[styles.acceptedText, { color: theme.success }]}>
+                                {language === 'ar' ? 'مقبول' : 'Accepted'}
+                              </Text>
+                            </View>
+                          )}
+                          <TouchableOpacity
+                            style={[styles.actionIconBtn, { backgroundColor: '#EF444415' }]}
+                            onPress={() => {
+                              showAlert(
+                                language === 'ar' ? 'حذف الإجابة' : 'Delete Answer',
+                                language === 'ar' ? 'هل أنت متأكد من حذف هذه الإجابة؟' : 'Are you sure you want to delete this answer?',
+                                [
+                                  { text: t.cancel, style: 'cancel' },
+                                  {
+                                    text: t.delete,
+                                    style: 'destructive',
+                                    onPress: () => deleteAnswer(answer.id),
+                                  },
+                                ]
+                              );
+                            }}
+                          >
+                            <Trash2 size={14} color="#EF4444" />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+              
+              <View style={styles.listItemActions}>
+                <TouchableOpacity
+                  style={[styles.actionIconBtn, { backgroundColor: '#EF444415' }]}
+                  onPress={() => {
+                    showAlert(
+                      language === 'ar' ? 'حذف السؤال' : 'Delete Question',
+                      language === 'ar' ? 'هل أنت متأكد من حذف هذا السؤال وجميع إجاباته؟' : 'Are you sure you want to delete this question and all its answers?',
+                      [
+                        { text: t.cancel, style: 'cancel' },
+                        {
+                          text: t.delete,
+                          style: 'destructive',
+                          onPress: () => deleteQuestion(question.id),
+                        },
+                      ]
+                    );
+                  }}
+                >
+                  <Trash2 size={16} color="#EF4444" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        })
+      )}
+    </View>
+  );
+
   const renderContact = () => (
     <View style={styles.listContainer}>
       <View style={[styles.listHeader, isRTL && styles.rtl]}>
@@ -1245,6 +1368,8 @@ export default function AdminScreen() {
         return renderLaws();
       case 'categories':
         return renderCategories();
+      case 'questions':
+        return renderQuestions();
       case 'users':
         return renderUsers();
       case 'contact':
@@ -1735,6 +1860,53 @@ const styles = StyleSheet.create({
   },
   listItemSubtitle: {
     fontSize: 13,
+  },
+  questionMeta: {
+    flexDirection: 'row',
+    gap: 16,
+    marginTop: 8,
+  },
+  metaText: {
+    fontSize: 12,
+  },
+  answersContainer: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.1)',
+  },
+  answersTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  answerItem: {
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  answerText: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  answerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: 8,
+    gap: 8,
+  },
+  acceptedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  acceptedText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   listItemActions: {
     flexDirection: 'row',

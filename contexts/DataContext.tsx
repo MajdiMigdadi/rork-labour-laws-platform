@@ -558,6 +558,38 @@ export const [DataProvider, useData] = createContextHook(() => {
     await saveCategories(updated);
   }, [categories]);
 
+  const deleteQuestion = useCallback(async (id: string) => {
+    if (API_CONFIG.USE_REAL_API) {
+      await apiCall(`/questions/${id}`, { method: 'DELETE' });
+    }
+    
+    // Delete the question
+    const updatedQuestions = questions.filter(q => q.id !== id);
+    await saveQuestions(updatedQuestions);
+    
+    // Also delete all answers for this question
+    const updatedAnswers = answers.filter(a => a.questionId !== id);
+    await saveAnswers(updatedAnswers);
+  }, [questions, answers]);
+
+  const deleteAnswer = useCallback(async (id: string) => {
+    if (API_CONFIG.USE_REAL_API) {
+      await apiCall(`/answers/${id}`, { method: 'DELETE' });
+    }
+    
+    const answer = answers.find(a => a.id === id);
+    const updatedAnswers = answers.filter(a => a.id !== id);
+    await saveAnswers(updatedAnswers);
+    
+    // Update question answer count
+    if (answer) {
+      const updatedQuestions = questions.map(q => 
+        q.id === answer.questionId ? { ...q, answerCount: Math.max(0, q.answerCount - 1) } : q
+      );
+      await saveQuestions(updatedQuestions);
+    }
+  }, [answers, questions]);
+
   return {
     countries,
     laws,
@@ -574,10 +606,12 @@ export const [DataProvider, useData] = createContextHook(() => {
     deleteLaw,
     addQuestion,
     updateQuestion,
+    deleteQuestion,
     voteQuestion,
     addAnswer,
     voteAnswer,
     acceptAnswer,
+    deleteAnswer,
     addCategory,
     updateCategory,
     deleteCategory,
