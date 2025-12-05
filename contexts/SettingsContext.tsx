@@ -159,6 +159,10 @@ export const [SettingsProvider, useSettings] = createContextHook(() => {
       console.log('Updates received:', Object.keys(updates));
       if (updates.logo) {
         console.log('Logo being saved, length:', updates.logo.length);
+        console.log('Logo preview:', updates.logo.substring(0, 50) + '...');
+      }
+      if (updates.favicon) {
+        console.log('Favicon being saved, length:', updates.favicon.length);
       }
       
       const newSettings = { ...settings, ...updates };
@@ -171,15 +175,29 @@ export const [SettingsProvider, useSettings] = createContextHook(() => {
         for (const [key, value] of Object.entries(updates)) {
           // Stringify complex objects
           apiPayload[key] = typeof value === 'object' ? JSON.stringify(value) : String(value);
+          console.log(`  - ${key}: ${typeof value === 'string' ? value.length + ' chars' : typeof value}`);
         }
         
-        const result = await apiCall('/settings', {
-          method: 'POST',
-          body: JSON.stringify(apiPayload),
-        });
-        
-        if (result) {
-          console.log('✅ Settings saved to API');
+        try {
+          const response = await fetch(`${API_BASE_URL}/settings`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: JSON.stringify(apiPayload),
+          });
+          
+          console.log('API Response status:', response.status);
+          
+          if (response.ok) {
+            console.log('✅ Settings saved to API');
+          } else {
+            const errorText = await response.text();
+            console.error('❌ API Error:', response.status, errorText);
+          }
+        } catch (apiError) {
+          console.error('❌ API Request failed:', apiError);
         }
       }
       
