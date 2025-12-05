@@ -156,12 +156,13 @@ export const [DataProvider, useData] = createContextHook(() => {
 
         // If we got data from API, we're done
         if (gotApiData) {
-          // Load answers from local storage (not yet in API)
+          // Load answers from API or local storage - NO mock data
           const storedAnswers = await AsyncStorage.getItem(ANSWERS_KEY);
           if (storedAnswers) {
             setAnswers(JSON.parse(storedAnswers));
           } else {
-            setAnswers(mockAnswers);
+            // Start with empty answers - no mock data
+            setAnswers([]);
           }
           setIsLoading(false);
           return;
@@ -189,18 +190,18 @@ export const [DataProvider, useData] = createContextHook(() => {
         }
       };
 
-      setCountries(parseOrDefault(storedCountries, mockCountries, COUNTRIES_KEY));
-      setLaws(parseOrDefault(storedLaws, mockLaws, LAWS_KEY));
-      setQuestions(parseOrDefault(storedQuestions, mockQuestions, QUESTIONS_KEY));
-      setAnswers(parseOrDefault(storedAnswers, mockAnswers, ANSWERS_KEY));
-      setCategories(parseOrDefault(storedCategories, mockCategories, CATEGORIES_KEY));
+      setCountries(parseOrDefault(storedCountries, [], COUNTRIES_KEY));
+      setLaws(parseOrDefault(storedLaws, [], LAWS_KEY));
+      setQuestions(parseOrDefault(storedQuestions, [], QUESTIONS_KEY));
+      setAnswers(parseOrDefault(storedAnswers, [], ANSWERS_KEY));
+      setCategories(parseOrDefault(storedCategories, [], CATEGORIES_KEY));
     } catch (error) {
       console.error('Failed to load data:', error);
-      setCountries(mockCountries);
-      setLaws(mockLaws);
-      setQuestions(mockQuestions);
-      setAnswers(mockAnswers);
-      setCategories(mockCategories);
+      setCountries([]);
+      setLaws([]);
+      setQuestions([]);
+      setAnswers([]);
+      setCategories([]);
     } finally {
       setIsLoading(false);
     }
