@@ -246,7 +246,13 @@ export default function AuthLoginScreen() {
               }
             ]}
           >
-            {settings.logo ? (
+            {settings.logoDark ? (
+              <Image 
+                source={{ uri: settings.logoDark }} 
+                style={styles.logo} 
+                contentFit="contain"
+              />
+            ) : settings.logo ? (
               <Image 
                 source={{ uri: settings.logo }} 
                 style={styles.logo} 

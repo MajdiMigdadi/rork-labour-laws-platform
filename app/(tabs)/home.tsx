@@ -183,11 +183,20 @@ export default function HomeScreen() {
                 <View style={styles.logoFallback}>
                   <Text style={{ color: '#fff', fontSize: 12 }}>Loading...</Text>
                 </View>
+              ) : settings.logoDark ? (
+                <Image 
+                  source={{ uri: settings.logoDark }} 
+                  style={styles.logo} 
+                  contentFit="contain"
+                  onError={(e) => {
+                    console.log('Logo error:', e);
+                  }}
+                />
               ) : settings.logo ? (
                 <Image 
                   source={{ uri: settings.logo }} 
                   style={styles.logo} 
-                  contentFit="cover"
+                  contentFit="contain"
                   onError={(e) => {
                     console.log('Logo error:', e);
                   }}

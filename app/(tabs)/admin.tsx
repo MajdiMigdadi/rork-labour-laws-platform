@@ -101,7 +101,7 @@ export default function AdminScreen() {
   const [userModalVisible, setUserModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState<User | undefined>();
   const [photoPickerVisible, setPhotoPickerVisible] = useState(false);
-  const [uploadType, setUploadType] = useState<'logo' | 'favicon'>('logo');
+  const [uploadType, setUploadType] = useState<'logo' | 'logoDark' | 'favicon'>('logo');
 
   const { users, updateAnyUser, deleteUser, banUser, unbanUser } = useAuth();
   const { messages: contactMessages, markAsRead, replyToMessage, deleteMessage: deleteContactMessage } = useContact();
@@ -268,14 +268,20 @@ export default function AdminScreen() {
   };
   
   const saveImage = async (uri: string) => {
-      const fieldToUpdate = uploadType === 'logo' ? 'logo' : 'favicon';
+      const fieldToUpdate = uploadType;
       const success = await updateSettings({ [fieldToUpdate]: uri });
     
+      const typeLabels = {
+        logo: 'Logo (Light)',
+        logoDark: 'Logo (Dark)',
+        favicon: 'Favicon'
+      };
+    
       if (success) {
-        showSuccess(t.success, `${uploadType === 'logo' ? 'Logo' : 'Favicon'} updated successfully`);
+        showSuccess(t.success, `${typeLabels[uploadType]} updated successfully`);
       } else {
-      showSuccess(t.error, 'Failed to update image');
-    }
+        showSuccess(t.error, 'Failed to update image');
+      }
   };
 
   // Quick stats for dashboard
@@ -1007,9 +1013,34 @@ export default function AdminScreen() {
               <ImageIcon size={16} color="#fff" />
               <Text style={styles.uploadBtnText}>
                 {settings.logo ? (language === 'ar' ? 'تغيير' : 'Change') : (language === 'ar' ? 'رفع' : 'Upload')}
-                        </Text>
+              </Text>
             </TouchableOpacity>
-                      </View>
+          </View>
+
+          <View style={styles.logoUploadItem}>
+            <Text style={[styles.logoUploadLabel, { color: theme.textSecondary }]}>
+              {language === 'ar' ? 'شعار داكن' : 'Dark Logo'}
+            </Text>
+            <View style={[styles.logoPreviewContainer, { backgroundColor: '#1F2937', borderColor: theme.border }]}>
+              {settings.logoDark ? (
+                <Image source={{ uri: settings.logoDark }} style={styles.logoPreviewImg} contentFit="contain" />
+              ) : (
+                <ImageIcon size={32} color="#9CA3AF" />
+              )}
+            </View>
+            <TouchableOpacity
+              style={[styles.uploadBtn, { backgroundColor: theme.primary }]}
+              onPress={() => {
+                setUploadType('logoDark');
+                setPhotoPickerVisible(true);
+              }}
+            >
+              <ImageIcon size={16} color="#fff" />
+              <Text style={styles.uploadBtnText}>
+                {settings.logoDark ? (language === 'ar' ? 'تغيير' : 'Change') : (language === 'ar' ? 'رفع' : 'Upload')}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
           <View style={styles.logoUploadItem}>
             <Text style={[styles.logoUploadLabel, { color: theme.textSecondary }]}>

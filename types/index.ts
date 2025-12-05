@@ -147,6 +147,7 @@ export interface AppSettings {
   secondaryColor: string;
   accentColor: string;
   logo?: string;
+  logoDark?: string;
   favicon?: string;
   footerText: string;
   seoTitle: string;
