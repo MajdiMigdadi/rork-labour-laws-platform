@@ -67,7 +67,7 @@ export default function LawDetailScreen() {
 
   const handleCopyLink = async () => {
     try {
-      const link = `https://app.legal/${law.id}`;
+      const link = `https://dlilk.me/law/${law.id}`;
       await Clipboard.setStringAsync(link);
       Alert.alert('Success', 'Link copied to clipboard!');
     } catch (error) {
@@ -271,7 +271,7 @@ export default function LawDetailScreen() {
         title={law.title}
         content={law.description}
         type="law"
-        url={`https://labourlawapp.com/laws/${law.id}`}
+        url={`https://dlilk.me/law/${law.id}`}
       />
     </>
   );

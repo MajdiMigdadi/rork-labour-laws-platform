@@ -54,7 +54,7 @@ export default function ShareModal({ visible, onClose, title, content, type, url
   const shareText = `${title}\n\n${content.substring(0, 200)}${content.length > 200 ? '...' : ''}\n\n${url || 'Labour Law Hub App'}`;
   const encodedText = encodeURIComponent(shareText);
   const encodedTitle = encodeURIComponent(title);
-  const encodedUrl = encodeURIComponent(url || 'https://labourlawapp.com');
+  const encodedUrl = encodeURIComponent(url || 'https://dlilk.me');
 
   const handleNativeShare = async () => {
     try {

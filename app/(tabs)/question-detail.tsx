@@ -261,7 +261,7 @@ export default function QuestionDetailScreen() {
 
   const handleCopyLink = async () => {
     try {
-      const link = `https://app.legal/q/${question.id}`;
+      const link = `https://dlilk.me/question/${question.id}`;
       await Clipboard.setStringAsync(link);
       Alert.alert('Success', 'Link copied to clipboard!');
     } catch (error) {
@@ -646,7 +646,7 @@ export default function QuestionDetailScreen() {
         title={question.title}
         content={question.content}
         type="question"
-        url={`https://labourlawapp.com/questions/${question.id}`}
+        url={`https://dlilk.me/question/${question.id}`}
       />
     </>
   );
