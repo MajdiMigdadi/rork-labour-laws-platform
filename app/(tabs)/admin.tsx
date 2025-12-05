@@ -36,6 +36,7 @@ import {
   Sparkles,
   LayoutDashboard,
   MessageSquare,
+  Upload,
 } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useData } from '@/contexts/DataContext';
@@ -54,6 +55,8 @@ import SettingsEditorModal from '@/components/SettingsEditorModal';
 import UserManagementModal from '@/components/UserManagementModal';
 import LanguageSettingsModal from '@/components/LanguageSettingsModal';
 import PhotoPickerModal from '@/components/PhotoPickerModal';
+import BulkUploadModal from '@/components/BulkUploadModal';
+import { API_CONFIG } from '@/services/api';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -102,6 +105,8 @@ export default function AdminScreen() {
   const [editingUser, setEditingUser] = useState<User | undefined>();
   const [photoPickerVisible, setPhotoPickerVisible] = useState(false);
   const [uploadType, setUploadType] = useState<'logo' | 'logoDark' | 'favicon'>('logo');
+  const [bulkUploadVisible, setBulkUploadVisible] = useState(false);
+  const [bulkUploadType, setBulkUploadType] = useState<'countries' | 'categories' | 'laws'>('countries');
 
   const { users, updateAnyUser, deleteUser, banUser, unbanUser } = useAuth();
   const { messages: contactMessages, markAsRead, replyToMessage, deleteMessage: deleteContactMessage } = useContact();
@@ -284,6 +289,50 @@ export default function AdminScreen() {
       }
   };
 
+  // Bulk upload handler
+  const handleBulkUpload = async (data: any[]): Promise<{ success: number; failed: number }> => {
+    let success = 0;
+    let failed = 0;
+    
+    const API_URL = API_CONFIG.API_URL;
+    const endpoints = {
+      countries: '/countries',
+      categories: '/categories',
+      laws: '/laws',
+    };
+    
+    for (const item of data) {
+      try {
+        const response = await fetch(`${API_URL}${endpoints[bulkUploadType]}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify(item),
+        });
+        
+        if (response.ok) {
+          success++;
+        } else {
+          failed++;
+          console.error('Failed to upload item:', await response.text());
+        }
+      } catch (error) {
+        failed++;
+        console.error('Error uploading item:', error);
+      }
+    }
+    
+    // Refresh data after bulk upload
+    if (success > 0) {
+      // Trigger data refresh by reloading
+      window?.location?.reload?.();
+    }
+    
+    return { success, failed };
+  };
+
   // Quick stats for dashboard
   const unreadMessages = contactMessages.filter(m => m.status === 'unread').length;
   const activeUsers = users.filter(u => u.status === 'active').length;
@@ -454,14 +503,28 @@ export default function AdminScreen() {
     <View style={styles.listContainer}>
       <View style={[styles.listHeader, isRTL && styles.rtl]}>
         <Text style={[styles.listTitle, { color: theme.text }]}>{t.manageCountries}</Text>
-        <TouchableOpacity 
-          style={[styles.addBtn, { backgroundColor: theme.primary }]} 
-          onPress={handleAddCountry}
-        >
-          <Plus size={18} color="#fff" />
-          <Text style={styles.addBtnText}>{t.add}</Text>
-              </TouchableOpacity>
-            </View>
+        <View style={[styles.headerButtons, isRTL && styles.rtl]}>
+          <TouchableOpacity 
+            style={[styles.bulkUploadBtn, { backgroundColor: theme.success + '20' }]} 
+            onPress={() => {
+              setBulkUploadType('countries');
+              setBulkUploadVisible(true);
+            }}
+          >
+            <Upload size={16} color={theme.success} />
+            <Text style={[styles.bulkUploadBtnText, { color: theme.success }]}>
+              {language === 'ar' ? 'رفع جماعي' : 'Bulk'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.addBtn, { backgroundColor: theme.primary }]} 
+            onPress={handleAddCountry}
+          >
+            <Plus size={18} color="#fff" />
+            <Text style={styles.addBtnText}>{t.add}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {countries.length === 0 ? (
         <View style={[styles.emptyState, { backgroundColor: theme.card }]}>
@@ -517,14 +580,28 @@ export default function AdminScreen() {
     <View style={styles.listContainer}>
       <View style={[styles.listHeader, isRTL && styles.rtl]}>
         <Text style={[styles.listTitle, { color: theme.text }]}>{t.manageLaws}</Text>
-        <TouchableOpacity 
-          style={[styles.addBtn, { backgroundColor: theme.primary }]} 
-          onPress={handleAddLaw}
-        >
-          <Plus size={18} color="#fff" />
-          <Text style={styles.addBtnText}>{t.add}</Text>
-              </TouchableOpacity>
-            </View>
+        <View style={[styles.headerButtons, isRTL && styles.rtl]}>
+          <TouchableOpacity 
+            style={[styles.bulkUploadBtn, { backgroundColor: theme.success + '20' }]} 
+            onPress={() => {
+              setBulkUploadType('laws');
+              setBulkUploadVisible(true);
+            }}
+          >
+            <Upload size={16} color={theme.success} />
+            <Text style={[styles.bulkUploadBtnText, { color: theme.success }]}>
+              {language === 'ar' ? 'رفع جماعي' : 'Bulk'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.addBtn, { backgroundColor: theme.primary }]} 
+            onPress={handleAddLaw}
+          >
+            <Plus size={18} color="#fff" />
+            <Text style={styles.addBtnText}>{t.add}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {laws.length === 0 ? (
         <View style={[styles.emptyState, { backgroundColor: theme.card }]}>
@@ -585,14 +662,28 @@ export default function AdminScreen() {
     <View style={styles.listContainer}>
       <View style={[styles.listHeader, isRTL && styles.rtl]}>
         <Text style={[styles.listTitle, { color: theme.text }]}>{t.manageCategories}</Text>
-        <TouchableOpacity 
-          style={[styles.addBtn, { backgroundColor: theme.primary }]} 
-          onPress={handleAddCategory}
-        >
-          <Plus size={18} color="#fff" />
-          <Text style={styles.addBtnText}>{t.add}</Text>
-              </TouchableOpacity>
-            </View>
+        <View style={[styles.headerButtons, isRTL && styles.rtl]}>
+          <TouchableOpacity 
+            style={[styles.bulkUploadBtn, { backgroundColor: theme.success + '20' }]} 
+            onPress={() => {
+              setBulkUploadType('categories');
+              setBulkUploadVisible(true);
+            }}
+          >
+            <Upload size={16} color={theme.success} />
+            <Text style={[styles.bulkUploadBtnText, { color: theme.success }]}>
+              {language === 'ar' ? 'رفع جماعي' : 'Bulk'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.addBtn, { backgroundColor: theme.primary }]} 
+            onPress={handleAddCategory}
+          >
+            <Plus size={18} color="#fff" />
+            <Text style={styles.addBtnText}>{t.add}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {categories.length === 0 ? (
         <View style={[styles.emptyState, { backgroundColor: theme.card }]}>
@@ -1296,6 +1387,13 @@ export default function AdminScreen() {
         onClose={() => setPhotoPickerVisible(false)}
         onPhotoSelected={handlePhotoSelected}
       />
+
+      <BulkUploadModal
+        visible={bulkUploadVisible}
+        onClose={() => setBulkUploadVisible(false)}
+        type={bulkUploadType}
+        onUpload={handleBulkUpload}
+      />
     </View>
   );
 }
@@ -1591,6 +1689,23 @@ const styles = StyleSheet.create({
   addBtnText: {
     color: '#fff',
     fontSize: 14,
+    fontWeight: '600',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  bulkUploadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    gap: 6,
+  },
+  bulkUploadBtnText: {
+    fontSize: 13,
     fontWeight: '600',
   },
   listItem: {
