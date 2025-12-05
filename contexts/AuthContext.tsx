@@ -10,6 +10,31 @@ const USERS_KEY = '@all_users';
 
 const API_URL = API_CONFIG.API_URL;
 
+// Helper to make API calls
+async function apiCall<T>(endpoint: string, options?: RequestInit): Promise<T | null> {
+  if (!API_CONFIG.USE_REAL_API) return null;
+  
+  try {
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      ...options,
+    });
+    
+    if (!response.ok) {
+      console.error(`API error ${response.status}`);
+      return null;
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('API call failed:', error);
+    return null;
+  }
+}
+
 export const [AuthProvider, useAuth] = createContextHook(() => {
   const [user, setUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
@@ -22,10 +47,10 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
 
   const loadData = async () => {
     try {
-      const [storedUser, storedToken, storedUsers] = await Promise.all([
+      // Load local auth data first
+      const [storedUser, storedToken] = await Promise.all([
         AsyncStorage.getItem(AUTH_KEY),
         AsyncStorage.getItem(AUTH_TOKEN),
-        AsyncStorage.getItem(USERS_KEY),
       ]);
 
       if (storedUser && storedToken) {
@@ -42,13 +67,43 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         }
       }
 
-      if (storedUsers) {
-        try {
-          const parsed = JSON.parse(storedUsers);
-          setUsers(parsed);
-        } catch (parseError) {
-          console.error('Failed to parse users JSON:', parseError);
-          setUsers([]);
+      // Load users from API
+      if (API_CONFIG.USE_REAL_API) {
+        console.log('📡 Loading users from API...');
+        const apiUsers = await apiCall<any[]>('/users');
+        if (apiUsers && Array.isArray(apiUsers)) {
+          const transformedUsers: User[] = apiUsers.map(u => ({
+            id: String(u.id),
+            email: u.email,
+            name: u.name,
+            role: u.role || 'user',
+            level: u.level || 'beginner',
+            reputation: u.reputation || 0,
+            status: u.status || 'active',
+            avatar: u.avatar,
+            bio: u.bio,
+            location: u.location,
+            company: u.company,
+            phone: u.phone,
+            website: u.website,
+            joinedDate: u.created_at || u.joinedDate,
+            lastLogin: u.last_login || u.lastLogin,
+          }));
+          console.log('✅ Users loaded from API:', transformedUsers.length);
+          setUsers(transformedUsers);
+          await AsyncStorage.setItem(USERS_KEY, JSON.stringify(transformedUsers));
+        }
+      } else {
+        // Fallback to local storage
+        const storedUsers = await AsyncStorage.getItem(USERS_KEY);
+        if (storedUsers) {
+          try {
+            const parsed = JSON.parse(storedUsers);
+            setUsers(parsed);
+          } catch (parseError) {
+            console.error('Failed to parse users JSON:', parseError);
+            setUsers([]);
+          }
         }
       }
     } catch (error) {
@@ -166,17 +221,89 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
 
   const updateUser = async (updates: Partial<User>) => {
     if (!user) return false;
+    
+    console.log('=== UPDATE USER ===');
+    console.log('Updates:', Object.keys(updates));
+    if (updates.avatar) {
+      console.log('Avatar being saved, length:', updates.avatar.length);
+    }
+    
     const updatedUser = { ...user, ...updates };
+    
+    // Save to API
+    if (API_CONFIG.USE_REAL_API) {
+      console.log('📡 Saving user to API...');
+      try {
+        const response = await fetch(`${API_URL}/users/${user.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify({
+            name: updatedUser.name,
+            avatar: updatedUser.avatar,
+            bio: updatedUser.bio,
+            location: updatedUser.location,
+            company: updatedUser.company,
+            phone: updatedUser.phone,
+            website: updatedUser.website,
+          }),
+        });
+        
+        console.log('API Response status:', response.status);
+        
+        if (response.ok) {
+          console.log('✅ User saved to API');
+        } else {
+          const errorText = await response.text();
+          console.error('❌ API Error:', response.status, errorText);
+        }
+      } catch (apiError) {
+        console.error('❌ API Request failed:', apiError);
+      }
+    }
+    
+    // Save locally
     await AsyncStorage.setItem(AUTH_KEY, JSON.stringify(updatedUser));
     setUser(updatedUser);
     
+    // Update in users list
     const updatedUsers = users.map(u => u.id === updatedUser.id ? updatedUser : u);
     await saveUsers(updatedUsers);
     
+    console.log('User saved successfully');
     return true;
   };
 
   const updateAnyUser = async (userId: string, updates: Partial<User>) => {
+    console.log('=== UPDATE ANY USER ===');
+    console.log('User ID:', userId);
+    console.log('Updates:', Object.keys(updates));
+    
+    // Save to API
+    if (API_CONFIG.USE_REAL_API) {
+      console.log('📡 Saving user to API...');
+      try {
+        const response = await fetch(`${API_URL}/users/${userId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify(updates),
+        });
+        
+        if (response.ok) {
+          console.log('✅ User saved to API');
+        } else {
+          console.error('❌ API Error:', response.status);
+        }
+      } catch (apiError) {
+        console.error('❌ API Request failed:', apiError);
+      }
+    }
+    
     const updatedUsers = users.map(u => u.id === userId ? { ...u, ...updates } : u);
     await saveUsers(updatedUsers);
     
@@ -192,21 +319,61 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   };
 
   const deleteUser = async (userId: string) => {
+    // Delete from API
+    if (API_CONFIG.USE_REAL_API) {
+      await apiCall(`/users/${userId}`, { method: 'DELETE' });
+    }
+    
     const updatedUsers = users.filter(u => u.id !== userId);
     await saveUsers(updatedUsers);
     return true;
   };
 
   const banUser = async (userId: string) => {
+    // Ban via API
+    if (API_CONFIG.USE_REAL_API) {
+      await apiCall(`/users/${userId}/ban`, { method: 'POST' });
+    }
     return updateAnyUser(userId, { status: 'banned' });
   };
 
   const unbanUser = async (userId: string) => {
+    // Unban via API
+    if (API_CONFIG.USE_REAL_API) {
+      await apiCall(`/users/${userId}/unban`, { method: 'POST' });
+    }
     return updateAnyUser(userId, { status: 'active' });
   };
 
   const changeUserRole = async (userId: string, role: User['role']) => {
     return updateAnyUser(userId, { role });
+  };
+
+  const refreshUsers = async () => {
+    if (API_CONFIG.USE_REAL_API) {
+      const apiUsers = await apiCall<any[]>('/users');
+      if (apiUsers && Array.isArray(apiUsers)) {
+        const transformedUsers: User[] = apiUsers.map(u => ({
+          id: String(u.id),
+          email: u.email,
+          name: u.name,
+          role: u.role || 'user',
+          level: u.level || 'beginner',
+          reputation: u.reputation || 0,
+          status: u.status || 'active',
+          avatar: u.avatar,
+          bio: u.bio,
+          location: u.location,
+          company: u.company,
+          phone: u.phone,
+          website: u.website,
+          joinedDate: u.created_at || u.joinedDate,
+          lastLogin: u.last_login || u.lastLogin,
+        }));
+        setUsers(transformedUsers);
+        await AsyncStorage.setItem(USERS_KEY, JSON.stringify(transformedUsers));
+      }
+    }
   };
 
   return {
@@ -225,5 +392,6 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     banUser,
     unbanUser,
     changeUserRole,
+    refreshUsers,
   };
 });
