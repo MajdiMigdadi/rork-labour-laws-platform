@@ -783,8 +783,8 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   logo: {
-    width: 160,
-    height: 60,
+    width: 240,
+    height: 100,
   },
   logoPlaceholder: {
     width: 88,

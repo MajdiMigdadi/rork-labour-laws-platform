@@ -559,15 +559,15 @@ const styles = StyleSheet.create({
     elevation: 12,
   },
   logoContainer: {
-    width: 200,
-    height: 80,
+    width: 280,
+    height: 120,
     marginBottom: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
   logo: {
-    width: 200,
-    height: 80,
+    width: 280,
+    height: 120,
   },
   logoFallback: {
     width: 100,

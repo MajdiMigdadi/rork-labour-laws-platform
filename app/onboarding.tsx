@@ -493,8 +493,8 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   logo: {
-    width: 200,
-    height: 80,
+    width: 280,
+    height: 120,
   },
   welcomeSection: {
     alignItems: 'center',
