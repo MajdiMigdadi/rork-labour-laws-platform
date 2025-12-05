@@ -19,20 +19,22 @@ import { BookmarksProvider } from '@/contexts/BookmarksContext';
 import FloatingActionButton from '@/components/FloatingActionButton';
 import AchievementPopup from '@/components/AchievementPopup';
 import { useFavicon } from '@/hooks/useFavicon';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
-function FaviconManager() {
+function BrowserMetaManager() {
   useFavicon();
+  useDocumentTitle();
   return null;
 }
 
 function RootLayoutNav() {
   return (
     <>
-      <FaviconManager />
+      <BrowserMetaManager />
       <Stack screenOptions={{ 
         headerBackTitle: 'Back',
       }}>
