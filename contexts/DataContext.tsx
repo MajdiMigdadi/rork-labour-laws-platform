@@ -3,12 +3,41 @@ import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Country, Law, Question, Answer, LawCategory } from '@/types';
 import { mockCountries, mockLaws, mockQuestions, mockAnswers, mockCategories, mockUsers } from '@/mocks/data';
+import { API_CONFIG } from '@/services/api';
 
 const COUNTRIES_KEY = '@data_countries';
 const LAWS_KEY = '@data_laws';
 const QUESTIONS_KEY = '@data_questions';
 const ANSWERS_KEY = '@data_answers';
 const CATEGORIES_KEY = '@data_categories';
+
+const API_BASE_URL = API_CONFIG.API_URL;
+
+// Helper to make API calls
+async function apiCall<T>(endpoint: string, options?: RequestInit): Promise<T | null> {
+  if (!API_CONFIG.USE_REAL_API) return null;
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      ...options,
+    });
+    
+    if (!response.ok) {
+      console.error(`API error ${response.status}:`, await response.text());
+      return null;
+    }
+    
+    const data = await response.json();
+    return data.data || data;
+  } catch (error) {
+    console.error('API call failed:', error);
+    return null;
+  }
+}
 
 export const [DataProvider, useData] = createContextHook(() => {
   const [countries, setCountries] = useState<Country[]>([]);
@@ -23,7 +52,58 @@ export const [DataProvider, useData] = createContextHook(() => {
   }, []);
 
   const loadData = async () => {
+    setIsLoading(true);
     try {
+      // Try to load from API first
+      if (API_CONFIG.USE_REAL_API) {
+        console.log('📡 Loading data from API...');
+        const [apiCountries, apiLaws, apiQuestions, apiCategories] = await Promise.all([
+          apiCall<Country[]>('/countries'),
+          apiCall<Law[]>('/laws'),
+          apiCall<Question[]>('/questions'),
+          apiCall<LawCategory[]>('/categories'),
+        ]);
+
+        if (apiCountries) {
+          console.log('✅ Countries loaded from API:', apiCountries.length);
+          setCountries(apiCountries);
+          await AsyncStorage.setItem(COUNTRIES_KEY, JSON.stringify(apiCountries));
+        }
+        
+        if (apiLaws) {
+          console.log('✅ Laws loaded from API:', apiLaws.length);
+          setLaws(apiLaws);
+          await AsyncStorage.setItem(LAWS_KEY, JSON.stringify(apiLaws));
+        }
+        
+        if (apiQuestions) {
+          console.log('✅ Questions loaded from API:', apiQuestions.length);
+          setQuestions(apiQuestions);
+          await AsyncStorage.setItem(QUESTIONS_KEY, JSON.stringify(apiQuestions));
+        }
+        
+        if (apiCategories) {
+          console.log('✅ Categories loaded from API:', apiCategories.length);
+          setCategories(apiCategories);
+          await AsyncStorage.setItem(CATEGORIES_KEY, JSON.stringify(apiCategories));
+        }
+
+        // If we got data from API, we're done
+        if (apiCountries || apiLaws || apiQuestions || apiCategories) {
+          // Load answers from local storage (not yet in API)
+          const storedAnswers = await AsyncStorage.getItem(ANSWERS_KEY);
+          if (storedAnswers) {
+            setAnswers(JSON.parse(storedAnswers));
+          } else {
+            setAnswers(mockAnswers);
+          }
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      // Fallback to local storage
+      console.log('📦 Loading data from local storage...');
       const [storedCountries, storedLaws, storedQuestions, storedAnswers, storedCategories] = await Promise.all([
         AsyncStorage.getItem(COUNTRIES_KEY),
         AsyncStorage.getItem(LAWS_KEY),
@@ -59,6 +139,11 @@ export const [DataProvider, useData] = createContextHook(() => {
       setIsLoading(false);
     }
   };
+
+  // Refresh data from API
+  const refreshData = useCallback(async () => {
+    await loadData();
+  }, []);
 
   const saveCountries = async (newCountries: Country[]) => {
     try {
@@ -106,6 +191,22 @@ export const [DataProvider, useData] = createContextHook(() => {
   };
 
   const addCountry = useCallback(async (country: Omit<Country, 'id' | 'lawCount'>) => {
+    // Try API first
+    if (API_CONFIG.USE_REAL_API) {
+      const apiResult = await apiCall<Country>('/countries', {
+        method: 'POST',
+        body: JSON.stringify({ ...country, law_count: 0 }),
+      });
+      
+      if (apiResult) {
+        const newCountry = { ...apiResult, lawCount: apiResult.lawCount || 0 };
+        const updated = [...countries, newCountry];
+        await saveCountries(updated);
+        return newCountry;
+      }
+    }
+    
+    // Fallback to local
     const newCountry: Country = {
       ...country,
       id: Date.now().toString(),
@@ -117,11 +218,24 @@ export const [DataProvider, useData] = createContextHook(() => {
   }, [countries]);
 
   const updateCountry = useCallback(async (id: string, updates: Partial<Country>) => {
+    // Try API first
+    if (API_CONFIG.USE_REAL_API) {
+      await apiCall(`/countries/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updates),
+      });
+    }
+    
     const updated = countries.map(c => c.id === id ? { ...c, ...updates } : c);
     await saveCountries(updated);
   }, [countries]);
 
   const deleteCountry = useCallback(async (id: string) => {
+    // Try API first
+    if (API_CONFIG.USE_REAL_API) {
+      await apiCall(`/countries/${id}`, { method: 'DELETE' });
+    }
+    
     const updated = countries.filter(c => c.id !== id);
     await saveCountries(updated);
     const updatedLaws = laws.filter(l => l.countryId !== id);
@@ -129,6 +243,36 @@ export const [DataProvider, useData] = createContextHook(() => {
   }, [countries, laws]);
 
   const addLaw = useCallback(async (law: Omit<Law, 'id'>) => {
+    // Try API first
+    if (API_CONFIG.USE_REAL_API) {
+      const apiResult = await apiCall<Law>('/laws', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...law,
+          country_id: law.countryId,
+          category_id: law.categoryId,
+        }),
+      });
+      
+      if (apiResult) {
+        const newLaw = { 
+          ...apiResult, 
+          countryId: apiResult.countryId || law.countryId,
+          categoryId: apiResult.categoryId || law.categoryId,
+        };
+        const updated = [...laws, newLaw];
+        await saveLaws(updated);
+        
+        const updatedCountries = countries.map(c => 
+          c.id === law.countryId ? { ...c, lawCount: c.lawCount + 1 } : c
+        );
+        await saveCountries(updatedCountries);
+        
+        return newLaw;
+      }
+    }
+    
+    // Fallback to local
     const newLaw: Law = {
       ...law,
       id: Date.now().toString(),
@@ -145,12 +289,26 @@ export const [DataProvider, useData] = createContextHook(() => {
   }, [laws, countries]);
 
   const updateLaw = useCallback(async (id: string, updates: Partial<Law>) => {
+    // Try API first
+    if (API_CONFIG.USE_REAL_API) {
+      await apiCall(`/laws/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updates),
+      });
+    }
+    
     const updated = laws.map(l => l.id === id ? { ...l, ...updates } : l);
     await saveLaws(updated);
   }, [laws]);
 
   const deleteLaw = useCallback(async (id: string) => {
     const law = laws.find(l => l.id === id);
+    
+    // Try API first
+    if (API_CONFIG.USE_REAL_API) {
+      await apiCall(`/laws/${id}`, { method: 'DELETE' });
+    }
+    
     const updated = laws.filter(l => l.id !== id);
     await saveLaws(updated);
     
@@ -163,6 +321,34 @@ export const [DataProvider, useData] = createContextHook(() => {
   }, [laws, countries]);
 
   const addQuestion = useCallback(async (question: Omit<Question, 'id' | 'votes' | 'answerCount' | 'createdAt' | 'isResolved'>) => {
+    // Try API first
+    if (API_CONFIG.USE_REAL_API) {
+      const apiResult = await apiCall<Question>('/questions', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...question,
+          user_id: question.userId,
+          country_id: question.countryId,
+        }),
+      });
+      
+      if (apiResult) {
+        const newQuestion = {
+          ...apiResult,
+          userId: apiResult.userId || question.userId,
+          countryId: apiResult.countryId || question.countryId,
+          votes: apiResult.votes || 0,
+          answerCount: apiResult.answerCount || 0,
+          isResolved: apiResult.isResolved || false,
+          createdAt: apiResult.createdAt || new Date().toISOString(),
+        };
+        const updated = [...questions, newQuestion];
+        await saveQuestions(updated);
+        return newQuestion;
+      }
+    }
+    
+    // Fallback to local
     const newQuestion: Question = {
       ...question,
       id: Date.now().toString(),
@@ -177,6 +363,13 @@ export const [DataProvider, useData] = createContextHook(() => {
   }, [questions]);
 
   const updateQuestion = useCallback(async (id: string, updates: Partial<Question>) => {
+    if (API_CONFIG.USE_REAL_API) {
+      await apiCall(`/questions/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updates),
+      });
+    }
+    
     const updated = questions.map(q => q.id === id ? { ...q, ...updates } : q);
     await saveQuestions(updated);
   }, [questions]);
@@ -244,6 +437,21 @@ export const [DataProvider, useData] = createContextHook(() => {
   }, [answers, questions]);
 
   const addCategory = useCallback(async (category: Omit<LawCategory, 'id'>) => {
+    // Try API first
+    if (API_CONFIG.USE_REAL_API) {
+      const apiResult = await apiCall<LawCategory>('/categories', {
+        method: 'POST',
+        body: JSON.stringify(category),
+      });
+      
+      if (apiResult) {
+        const updated = [...categories, apiResult];
+        await saveCategories(updated);
+        return apiResult;
+      }
+    }
+    
+    // Fallback to local
     const newCategory: LawCategory = {
       ...category,
       id: Date.now().toString(),
@@ -254,11 +462,22 @@ export const [DataProvider, useData] = createContextHook(() => {
   }, [categories]);
 
   const updateCategory = useCallback(async (id: string, updates: Partial<LawCategory>) => {
+    if (API_CONFIG.USE_REAL_API) {
+      await apiCall(`/categories/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updates),
+      });
+    }
+    
     const updated = categories.map(c => c.id === id ? { ...c, ...updates } : c);
     await saveCategories(updated);
   }, [categories]);
 
   const deleteCategory = useCallback(async (id: string) => {
+    if (API_CONFIG.USE_REAL_API) {
+      await apiCall(`/categories/${id}`, { method: 'DELETE' });
+    }
+    
     const updated = categories.filter(c => c.id !== id);
     await saveCategories(updated);
   }, [categories]);
@@ -270,6 +489,7 @@ export const [DataProvider, useData] = createContextHook(() => {
     answers,
     categories,
     isLoading,
+    refreshData,
     addCountry,
     updateCountry,
     deleteCountry,
