@@ -33,8 +33,6 @@ import {
   Sparkles,
   Check,
   Globe,
-  Shield,
-  Zap,
 } from 'lucide-react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { useSettings } from '@/contexts/SettingsContext';
@@ -408,20 +406,6 @@ export default function AuthLoginScreen() {
             </TouchableOpacity>
           </Animated.View>
 
-          {/* Demo Info */}
-          <View style={styles.demoBox}>
-            <View style={styles.demoHeader}>
-              <Zap size={14} color="#FBBF24" />
-              <Text style={styles.demoTitle}>
-                {language === 'ar' ? 'جرب الآن' : 'Try Demo'}
-              </Text>
-            </View>
-            <Text style={styles.demoEmail}>admin@labourlaw.com</Text>
-            <Text style={styles.demoHint}>
-              {language === 'ar' ? 'كلمة المرور: أي شيء' : 'Password: anything'}
-            </Text>
-          </View>
-
           {/* Skip */}
           <TouchableOpacity 
             style={styles.skipBtn}
@@ -733,15 +717,6 @@ export default function AuthLoginScreen() {
               </Text>
             </TouchableOpacity>
 
-            {/* Demo for login */}
-            {mode === 'login' && (
-              <View style={[styles.formDemoBox, { backgroundColor: theme.backgroundSecondary }]}>
-                <Shield size={14} color={theme.primary} />
-                <Text style={[styles.formDemoText, { color: theme.textSecondary }]}>
-                  Demo: admin@labourlaw.com
-                </Text>
-              </View>
-            )}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
