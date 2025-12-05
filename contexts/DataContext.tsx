@@ -39,6 +39,62 @@ async function apiCall<T>(endpoint: string, options?: RequestInit): Promise<T | 
   }
 }
 
+// Transform API country to app format (snake_case to camelCase)
+function transformCountry(apiCountry: any): Country {
+  return {
+    id: String(apiCountry.id),
+    name: apiCountry.name,
+    nameAr: apiCountry.name_ar || apiCountry.nameAr || '',
+    code: apiCountry.code,
+    flag: apiCountry.flag,
+    description: apiCountry.description || '',
+    descriptionAr: apiCountry.description_ar || apiCountry.descriptionAr || '',
+    lawCount: apiCountry.law_count || apiCountry.lawCount || 0,
+  };
+}
+
+// Transform API law to app format
+function transformLaw(apiLaw: any): Law {
+  return {
+    id: String(apiLaw.id),
+    title: apiLaw.title,
+    titleAr: apiLaw.title_ar || apiLaw.titleAr || '',
+    content: apiLaw.content,
+    contentAr: apiLaw.content_ar || apiLaw.contentAr || '',
+    countryId: String(apiLaw.country_id || apiLaw.countryId),
+    categoryId: String(apiLaw.category_id || apiLaw.categoryId),
+    source: apiLaw.source || '',
+    lastUpdated: apiLaw.last_updated || apiLaw.lastUpdated || apiLaw.updated_at || '',
+  };
+}
+
+// Transform API category to app format
+function transformCategory(apiCategory: any): LawCategory {
+  return {
+    id: String(apiCategory.id),
+    name: apiCategory.name,
+    nameAr: apiCategory.name_ar || apiCategory.nameAr || '',
+    icon: apiCategory.icon || 'FileText',
+    color: apiCategory.color || '#6366F1',
+  };
+}
+
+// Transform API question to app format
+function transformQuestion(apiQuestion: any): Question {
+  return {
+    id: String(apiQuestion.id),
+    title: apiQuestion.title,
+    content: apiQuestion.content,
+    userId: String(apiQuestion.user_id || apiQuestion.userId),
+    countryId: String(apiQuestion.country_id || apiQuestion.countryId),
+    tags: apiQuestion.tags || [],
+    votes: apiQuestion.votes || 0,
+    answerCount: apiQuestion.answer_count || apiQuestion.answerCount || 0,
+    createdAt: apiQuestion.created_at || apiQuestion.createdAt || '',
+    isResolved: apiQuestion.is_resolved || apiQuestion.isResolved || false,
+  };
+}
+
 export const [DataProvider, useData] = createContextHook(() => {
   const [countries, setCountries] = useState<Country[]>([]);
   const [laws, setLaws] = useState<Law[]>([]);
@@ -58,38 +114,48 @@ export const [DataProvider, useData] = createContextHook(() => {
       if (API_CONFIG.USE_REAL_API) {
         console.log('📡 Loading data from API...');
         const [apiCountries, apiLaws, apiQuestions, apiCategories] = await Promise.all([
-          apiCall<Country[]>('/countries'),
-          apiCall<Law[]>('/laws'),
-          apiCall<Question[]>('/questions'),
-          apiCall<LawCategory[]>('/categories'),
+          apiCall<any[]>('/countries'),
+          apiCall<any[]>('/laws'),
+          apiCall<any[]>('/questions'),
+          apiCall<any[]>('/categories'),
         ]);
 
-        if (apiCountries) {
-          console.log('✅ Countries loaded from API:', apiCountries.length);
-          setCountries(apiCountries);
-          await AsyncStorage.setItem(COUNTRIES_KEY, JSON.stringify(apiCountries));
+        let gotApiData = false;
+
+        if (apiCountries && Array.isArray(apiCountries)) {
+          const transformedCountries = apiCountries.map(transformCountry);
+          console.log('✅ Countries loaded from API:', transformedCountries.length);
+          setCountries(transformedCountries);
+          await AsyncStorage.setItem(COUNTRIES_KEY, JSON.stringify(transformedCountries));
+          gotApiData = true;
         }
         
-        if (apiLaws) {
-          console.log('✅ Laws loaded from API:', apiLaws.length);
-          setLaws(apiLaws);
-          await AsyncStorage.setItem(LAWS_KEY, JSON.stringify(apiLaws));
+        if (apiLaws && Array.isArray(apiLaws)) {
+          const transformedLaws = apiLaws.map(transformLaw);
+          console.log('✅ Laws loaded from API:', transformedLaws.length);
+          setLaws(transformedLaws);
+          await AsyncStorage.setItem(LAWS_KEY, JSON.stringify(transformedLaws));
+          gotApiData = true;
         }
         
-        if (apiQuestions) {
-          console.log('✅ Questions loaded from API:', apiQuestions.length);
-          setQuestions(apiQuestions);
-          await AsyncStorage.setItem(QUESTIONS_KEY, JSON.stringify(apiQuestions));
+        if (apiQuestions && Array.isArray(apiQuestions)) {
+          const transformedQuestions = apiQuestions.map(transformQuestion);
+          console.log('✅ Questions loaded from API:', transformedQuestions.length);
+          setQuestions(transformedQuestions);
+          await AsyncStorage.setItem(QUESTIONS_KEY, JSON.stringify(transformedQuestions));
+          gotApiData = true;
         }
         
-        if (apiCategories) {
-          console.log('✅ Categories loaded from API:', apiCategories.length);
-          setCategories(apiCategories);
-          await AsyncStorage.setItem(CATEGORIES_KEY, JSON.stringify(apiCategories));
+        if (apiCategories && Array.isArray(apiCategories)) {
+          const transformedCategories = apiCategories.map(transformCategory);
+          console.log('✅ Categories loaded from API:', transformedCategories.length);
+          setCategories(transformedCategories);
+          await AsyncStorage.setItem(CATEGORIES_KEY, JSON.stringify(transformedCategories));
+          gotApiData = true;
         }
 
         // If we got data from API, we're done
-        if (apiCountries || apiLaws || apiQuestions || apiCategories) {
+        if (gotApiData) {
           // Load answers from local storage (not yet in API)
           const storedAnswers = await AsyncStorage.getItem(ANSWERS_KEY);
           if (storedAnswers) {
@@ -193,13 +259,21 @@ export const [DataProvider, useData] = createContextHook(() => {
   const addCountry = useCallback(async (country: Omit<Country, 'id' | 'lawCount'>) => {
     // Try API first
     if (API_CONFIG.USE_REAL_API) {
-      const apiResult = await apiCall<Country>('/countries', {
+      const apiResult = await apiCall<any>('/countries', {
         method: 'POST',
-        body: JSON.stringify({ ...country, law_count: 0 }),
+        body: JSON.stringify({
+          name: country.name,
+          name_ar: country.nameAr,
+          code: country.code,
+          flag: country.flag,
+          description: country.description,
+          description_ar: country.descriptionAr,
+          law_count: 0,
+        }),
       });
       
       if (apiResult) {
-        const newCountry = { ...apiResult, lawCount: apiResult.lawCount || 0 };
+        const newCountry = transformCountry(apiResult);
         const updated = [...countries, newCountry];
         await saveCountries(updated);
         return newCountry;
@@ -245,21 +319,22 @@ export const [DataProvider, useData] = createContextHook(() => {
   const addLaw = useCallback(async (law: Omit<Law, 'id'>) => {
     // Try API first
     if (API_CONFIG.USE_REAL_API) {
-      const apiResult = await apiCall<Law>('/laws', {
+      const apiResult = await apiCall<any>('/laws', {
         method: 'POST',
         body: JSON.stringify({
-          ...law,
+          title: law.title,
+          title_ar: law.titleAr,
+          content: law.content,
+          content_ar: law.contentAr,
           country_id: law.countryId,
           category_id: law.categoryId,
+          source: law.source,
+          last_updated: law.lastUpdated,
         }),
       });
       
       if (apiResult) {
-        const newLaw = { 
-          ...apiResult, 
-          countryId: apiResult.countryId || law.countryId,
-          categoryId: apiResult.categoryId || law.categoryId,
-        };
+        const newLaw = transformLaw(apiResult);
         const updated = [...laws, newLaw];
         await saveLaws(updated);
         
@@ -323,25 +398,19 @@ export const [DataProvider, useData] = createContextHook(() => {
   const addQuestion = useCallback(async (question: Omit<Question, 'id' | 'votes' | 'answerCount' | 'createdAt' | 'isResolved'>) => {
     // Try API first
     if (API_CONFIG.USE_REAL_API) {
-      const apiResult = await apiCall<Question>('/questions', {
+      const apiResult = await apiCall<any>('/questions', {
         method: 'POST',
         body: JSON.stringify({
-          ...question,
+          title: question.title,
+          content: question.content,
           user_id: question.userId,
           country_id: question.countryId,
+          tags: question.tags,
         }),
       });
       
       if (apiResult) {
-        const newQuestion = {
-          ...apiResult,
-          userId: apiResult.userId || question.userId,
-          countryId: apiResult.countryId || question.countryId,
-          votes: apiResult.votes || 0,
-          answerCount: apiResult.answerCount || 0,
-          isResolved: apiResult.isResolved || false,
-          createdAt: apiResult.createdAt || new Date().toISOString(),
-        };
+        const newQuestion = transformQuestion(apiResult);
         const updated = [...questions, newQuestion];
         await saveQuestions(updated);
         return newQuestion;
@@ -439,15 +508,21 @@ export const [DataProvider, useData] = createContextHook(() => {
   const addCategory = useCallback(async (category: Omit<LawCategory, 'id'>) => {
     // Try API first
     if (API_CONFIG.USE_REAL_API) {
-      const apiResult = await apiCall<LawCategory>('/categories', {
+      const apiResult = await apiCall<any>('/categories', {
         method: 'POST',
-        body: JSON.stringify(category),
+        body: JSON.stringify({
+          name: category.name,
+          name_ar: category.nameAr,
+          icon: category.icon,
+          color: category.color,
+        }),
       });
       
       if (apiResult) {
-        const updated = [...categories, apiResult];
+        const newCategory = transformCategory(apiResult);
+        const updated = [...categories, newCategory];
         await saveCategories(updated);
-        return apiResult;
+        return newCategory;
       }
     }
     
