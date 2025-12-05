@@ -5,11 +5,11 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
   TextInput,
   Dimensions,
   Platform,
 } from 'react-native';
+import { showAlert, showSuccess } from '@/utils/alert';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   Plus,
@@ -146,7 +146,7 @@ export default function AdminScreen() {
   };
 
   const handleDeleteCountry = (country: Country) => {
-    Alert.alert(
+    showAlert(
       t.deleteCountry,
       `${t.areYouSure} ${getTranslatedName(country)}? ${t.deleteConfirm}`,
       [
@@ -156,7 +156,7 @@ export default function AdminScreen() {
           style: 'destructive', 
           onPress: async () => {
             await deleteCountry(country.id);
-            Alert.alert(t.success, `${getTranslatedName(country)} deleted`);
+            showSuccess(t.success, `${getTranslatedName(country)} deleted`);
           } 
         },
       ]
@@ -183,7 +183,7 @@ export default function AdminScreen() {
   };
 
   const handleDeleteLaw = (law: Law) => {
-    Alert.alert(
+    showAlert(
       t.deleteLaw,
       `${t.areYouSure} ${law.title}? ${t.deleteConfirm}`,
       [
@@ -193,7 +193,7 @@ export default function AdminScreen() {
           style: 'destructive', 
           onPress: async () => {
             await deleteLaw(law.id);
-            Alert.alert(t.success, `${law.title} deleted`);
+            showSuccess(t.success, `${law.title} deleted`);
           } 
         },
       ]
@@ -220,7 +220,7 @@ export default function AdminScreen() {
   };
 
   const handleDeleteCategory = (category: LawCategory) => {
-    Alert.alert(
+    showAlert(
       t.deleteCategory,
       `${t.areYouSure} ${getTranslatedName(category)}? ${t.deleteConfirm}`,
       [
@@ -230,7 +230,7 @@ export default function AdminScreen() {
           style: 'destructive', 
           onPress: async () => {
             await deleteCategory(category.id);
-            Alert.alert(t.success, `${getTranslatedName(category)} deleted`);
+            showSuccess(t.success, `${getTranslatedName(category)} deleted`);
           } 
         },
       ]
@@ -250,7 +250,7 @@ export default function AdminScreen() {
   const handlePhotoSelected = async (uri: string) => {
     try {
       if (uri.startsWith('blob:')) {
-        Alert.alert(
+        showAlert(
           'Warning', 
           'This image type may not persist. Please use "Use Image URL" option with a permanent URL instead.',
           [
@@ -263,7 +263,7 @@ export default function AdminScreen() {
       await saveImage(uri);
     } catch (error) {
       console.error('Error updating image:', error);
-      Alert.alert(t.error, 'Failed to update image');
+      showSuccess(t.error, 'Failed to update image');
     }
   };
   
@@ -272,9 +272,9 @@ export default function AdminScreen() {
       const success = await updateSettings({ [fieldToUpdate]: uri });
     
       if (success) {
-        Alert.alert(t.success, `${uploadType === 'logo' ? 'Logo' : 'Favicon'} updated successfully`);
+        showSuccess(t.success, `${uploadType === 'logo' ? 'Logo' : 'Favicon'} updated successfully`);
       } else {
-      Alert.alert(t.error, 'Failed to update image');
+      showSuccess(t.error, 'Failed to update image');
     }
   };
 
@@ -817,25 +817,37 @@ export default function AdminScreen() {
                     )}
                     <TouchableOpacity
                 style={[styles.msgActionBtn, { backgroundColor: '#10B98115' }]}
-                      onPress={() => {
-                        Alert.prompt(
-                    language === 'ar' ? 'الرد على الرسالة' : 'Reply to Message',
-                    `${language === 'ar' ? 'الرد على' : 'Reply to'} ${msg.name}:`,
-                          [
-                      { text: t.cancel, style: 'cancel' },
-                            {
-                        text: language === 'ar' ? 'إرسال' : 'Send',
-                              onPress: async (text: string | undefined) => {
-                                if (text && text.trim()) {
-                                  await replyToMessage(msg.id, text.trim());
-                            Alert.alert(t.success, language === 'ar' ? 'تم إرسال الرد' : 'Reply sent');
-                                }
+                      onPress={async () => {
+                        if (Platform.OS === 'web') {
+                          const text = window.prompt(
+                            `${language === 'ar' ? 'الرد على' : 'Reply to'} ${msg.name}:`,
+                            msg.adminReply || ''
+                          );
+                          if (text && text.trim()) {
+                            await replyToMessage(msg.id, text.trim());
+                            showSuccess(t.success, language === 'ar' ? 'تم إرسال الرد' : 'Reply sent');
+                          }
+                        } else {
+                          const { Alert: NativeAlert } = require('react-native');
+                          NativeAlert.prompt(
+                            language === 'ar' ? 'الرد على الرسالة' : 'Reply to Message',
+                            `${language === 'ar' ? 'الرد على' : 'Reply to'} ${msg.name}:`,
+                            [
+                              { text: t.cancel, style: 'cancel' },
+                              {
+                                text: language === 'ar' ? 'إرسال' : 'Send',
+                                onPress: async (text: string | undefined) => {
+                                  if (text && text.trim()) {
+                                    await replyToMessage(msg.id, text.trim());
+                                    showSuccess(t.success, language === 'ar' ? 'تم إرسال الرد' : 'Reply sent');
+                                  }
+                                },
                               },
-                            },
-                          ],
-                          'plain-text',
-                          msg.adminReply || ''
-                        );
+                            ],
+                            'plain-text',
+                            msg.adminReply || ''
+                          );
+                        }
                       }}
                     >
                 <Mail size={14} color="#10B981" />
@@ -846,7 +858,7 @@ export default function AdminScreen() {
                     <TouchableOpacity
                 style={[styles.msgActionBtn, { backgroundColor: '#EF444415' }]}
                       onPress={() => {
-                        Alert.alert(
+                        showAlert(
                     language === 'ar' ? 'حذف الرسالة' : 'Delete Message',
                     language === 'ar' ? 'هل أنت متأكد من حذف هذه الرسالة؟' : 'Are you sure you want to delete this message?',
                           [

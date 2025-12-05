@@ -6,9 +6,9 @@ import {
   TouchableOpacity,
   SectionList,
   Animated,
-  Alert,
   Switch,
 } from 'react-native';
+import { showAlert, showSuccess } from '@/utils/alert';
 import { useRouter } from 'expo-router';
 import {
   Bell,
@@ -75,7 +75,7 @@ export default function NotificationsScreen() {
     // Send one random demo notification
     const randomDemo = demos[Math.floor(Math.random() * demos.length)];
     randomDemo();
-    Alert.alert('Demo', 'A demo notification has been sent!');
+    showSuccess('Demo', 'A demo notification has been sent!');
   };
 
   // Animations
@@ -144,7 +144,7 @@ export default function NotificationsScreen() {
   };
 
   const handleClearAll = () => {
-    Alert.alert(
+    showAlert(
       t.clearAll,
       t.areYouSure,
       [

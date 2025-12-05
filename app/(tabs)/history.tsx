@@ -6,8 +6,8 @@ import {
   TouchableOpacity,
   FlatList,
   Animated,
-  Alert,
 } from 'react-native';
+import { showAlert } from '@/utils/alert';
 import { useRouter } from 'expo-router';
 import { 
   Clock, 
@@ -65,7 +65,7 @@ export default function HistoryScreen() {
   };
 
   const handleClearHistory = () => {
-    Alert.alert(
+    showAlert(
       t.clearHistory || 'Clear History',
       t.clearHistoryConfirm || 'Are you sure you want to clear all reading history?',
       [

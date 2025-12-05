@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, Platform, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, Switch } from 'react-native';
+import { showAlert } from '@/utils/alert';
 import { LogOut, Award, TrendingUp, MessageCircle, Edit2, MapPin, Briefcase, Globe, User as UserIcon, Moon, Sun, Bell, Sparkles, ChevronRight, Shield, Star, CheckCircle, Calendar, Languages } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -28,7 +29,7 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = () => {
-    Alert.alert(t.logout, t.areYouSure, [
+    showAlert(t.logout, t.areYouSure, [
       { text: t.cancel, style: 'cancel' },
       {
         text: t.logout,
