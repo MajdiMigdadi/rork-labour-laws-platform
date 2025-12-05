@@ -18,14 +18,21 @@ import { AchievementsProvider } from '@/contexts/AchievementsContext';
 import { BookmarksProvider } from '@/contexts/BookmarksContext';
 import FloatingActionButton from '@/components/FloatingActionButton';
 import AchievementPopup from '@/components/AchievementPopup';
+import { useFavicon } from '@/hooks/useFavicon';
 
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
+function FaviconManager() {
+  useFavicon();
+  return null;
+}
+
 function RootLayoutNav() {
   return (
     <>
+      <FaviconManager />
       <Stack screenOptions={{ 
         headerBackTitle: 'Back',
       }}>
