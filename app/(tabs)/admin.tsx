@@ -112,6 +112,7 @@ export default function AdminScreen() {
   const [uploadType, setUploadType] = useState<'logo' | 'logoDark' | 'favicon'>('logo');
   const [bulkUploadVisible, setBulkUploadVisible] = useState(false);
   const [bulkUploadType, setBulkUploadType] = useState<'countries' | 'categories' | 'laws'>('countries');
+  const [expandedQuestions, setExpandedQuestions] = useState<string[]>([]);
 
   const { users, updateAnyUser, deleteUser, banUser, unbanUser } = useAuth();
   const { messages: contactMessages, markAsRead, replyToMessage, deleteMessage: deleteContactMessage } = useContact();
@@ -825,122 +826,232 @@ export default function AdminScreen() {
             </View>
   );
 
-  const renderQuestions = () => (
-    <View style={styles.listContainer}>
-      <View style={[styles.listHeader, isRTL && styles.rtl]}>
-        <Text style={[styles.listTitle, { color: theme.text }]}>
-          {language === 'ar' ? 'إدارة الأسئلة والأجوبة' : 'Manage Q&A'}
-        </Text>
-      </View>
+  const toggleExpandQuestion = (id: string) => {
+    setExpandedQuestions(prev => 
+      prev.includes(id) ? prev.filter(q => q !== id) : [...prev, id]
+    );
+  };
 
-      {questions.length === 0 ? (
-        <View style={[styles.emptyState, { backgroundColor: theme.card }]}>
-          <MessageSquare size={48} color={theme.textSecondary} />
-          <Text style={[styles.emptyTitle, { color: theme.text }]}>
-            {language === 'ar' ? 'لا توجد أسئلة' : 'No Questions Yet'}
+  const renderQuestions = () => (
+      <View style={styles.listContainer}>
+        {/* Header with Stats */}
+        <View style={[styles.listHeader, isRTL && styles.rtl]}>
+          <Text style={[styles.listTitle, { color: theme.text }]}>
+            {language === 'ar' ? 'إدارة الأسئلة والأجوبة' : 'Manage Q&A'}
           </Text>
+          <View style={[styles.qaStats, isRTL && styles.rtl]}>
+            <View style={[styles.qaStat, { backgroundColor: theme.primary + '15' }]}>
+              <Text style={[styles.qaStatNumber, { color: theme.primary }]}>{questions.length}</Text>
+              <Text style={[styles.qaStatLabel, { color: theme.primary }]}>
+                {language === 'ar' ? 'سؤال' : 'Q'}
+              </Text>
+            </View>
+            <View style={[styles.qaStat, { backgroundColor: theme.success + '15' }]}>
+              <Text style={[styles.qaStatNumber, { color: theme.success }]}>{answers.length}</Text>
+              <Text style={[styles.qaStatLabel, { color: theme.success }]}>
+                {language === 'ar' ? 'إجابة' : 'A'}
+              </Text>
+            </View>
+          </View>
         </View>
-      ) : (
-        questions.map((question) => {
-          const questionAnswers = answers.filter(a => a.questionId === question.id);
-          return (
-            <View 
-              key={question.id} 
-              style={[styles.listItem, { backgroundColor: theme.card }]}
-            >
-              <View style={styles.listItemContent}>
-                <View style={[styles.listItemHeader, isRTL && styles.rtl]}>
-                  <Text style={[styles.listItemTitle, { color: theme.text }]} numberOfLines={2}>
-                    {question.title}
-                  </Text>
-                  {question.isResolved && (
-                    <CheckCircle size={16} color={theme.success} />
-                  )}
+
+        {questions.length === 0 ? (
+          <View style={[styles.emptyState, { backgroundColor: theme.card }]}>
+            <MessageSquare size={48} color={theme.textSecondary} />
+            <Text style={[styles.emptyTitle, { color: theme.text }]}>
+              {language === 'ar' ? 'لا توجد أسئلة' : 'No Questions Yet'}
+            </Text>
+            <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
+              {language === 'ar' ? 'سيظهر هنا الأسئلة المطروحة من المستخدمين' : 'User questions will appear here'}
+            </Text>
+          </View>
+        ) : (
+          questions.map((question) => {
+            const questionAnswers = answers.filter(a => a.questionId === question.id);
+            const isExpanded = expandedQuestions.includes(question.id);
+            const questionUser = users.find(u => u.id === question.userId);
+            
+            return (
+              <View 
+                key={question.id} 
+                style={[styles.qaCard, { backgroundColor: theme.card }]}
+              >
+                {/* Question Header with Status */}
+                <View style={[styles.qaCardHeader, isRTL && styles.rtl]}>
+                  <View style={[
+                    styles.qaStatusBadge, 
+                    { backgroundColor: question.isResolved ? theme.success + '20' : theme.warning + '20' }
+                  ]}>
+                    {question.isResolved ? (
+                      <CheckCircle size={14} color={theme.success} />
+                    ) : (
+                      <AlertCircle size={14} color={theme.warning} />
+                    )}
+                    <Text style={[
+                      styles.qaStatusText, 
+                      { color: question.isResolved ? theme.success : theme.warning }
+                    ]}>
+                      {question.isResolved 
+                        ? (language === 'ar' ? 'تم الحل' : 'Resolved')
+                        : (language === 'ar' ? 'مفتوح' : 'Open')
+                      }
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.qaDeleteBtn, { backgroundColor: '#EF444415' }]}
+                    onPress={() => {
+                      showAlert(
+                        language === 'ar' ? 'حذف السؤال' : 'Delete Question',
+                        language === 'ar' 
+                          ? `هل أنت متأكد من حذف "${question.title}" وجميع إجاباته (${questionAnswers.length})؟` 
+                          : `Delete "${question.title}" and all ${questionAnswers.length} answers?`,
+                        [
+                          { text: t.cancel, style: 'cancel' },
+                          {
+                            text: t.delete,
+                            style: 'destructive',
+                            onPress: () => deleteQuestion(question.id),
+                          },
+                        ]
+                      );
+                    }}
+                  >
+                    <Trash2 size={16} color="#EF4444" />
+                  </TouchableOpacity>
                 </View>
-                <Text style={[styles.listItemSubtitle, { color: theme.textSecondary }]} numberOfLines={1}>
+
+                {/* Question Title */}
+                <Text style={[styles.qaTitle, { color: theme.text }]} numberOfLines={2}>
+                  {question.title}
+                </Text>
+
+                {/* Question Content Preview */}
+                <Text style={[styles.qaContent, { color: theme.textSecondary }]} numberOfLines={2}>
                   {question.content}
                 </Text>
-                <View style={[styles.questionMeta, isRTL && styles.rtl]}>
-                  <Text style={[styles.metaText, { color: theme.textSecondary }]}>
-                    {questionAnswers.length} {language === 'ar' ? 'إجابة' : 'answers'}
-                  </Text>
-                  <Text style={[styles.metaText, { color: theme.textSecondary }]}>
-                    {question.votes} {language === 'ar' ? 'صوت' : 'votes'}
-                  </Text>
-                </View>
-                
-                {/* Answers List */}
-                {questionAnswers.length > 0 && (
-                  <View style={styles.answersContainer}>
-                    <Text style={[styles.answersTitle, { color: theme.text }]}>
-                      {language === 'ar' ? 'الإجابات:' : 'Answers:'}
+
+                {/* Question Meta */}
+                <View style={[styles.qaMetaRow, isRTL && styles.rtl]}>
+                  <View style={[styles.qaMetaItem, isRTL && styles.rtl]}>
+                    <Users size={14} color={theme.textSecondary} />
+                    <Text style={[styles.qaMetaText, { color: theme.textSecondary }]}>
+                      {questionUser?.name || (language === 'ar' ? 'مستخدم' : 'User')}
                     </Text>
-                    {questionAnswers.map((answer) => (
-                      <View key={answer.id} style={[styles.answerItem, { backgroundColor: theme.backgroundSecondary }]}>
-                        <Text style={[styles.answerText, { color: theme.text }]} numberOfLines={2}>
-                          {answer.content}
-                        </Text>
-                        <View style={[styles.answerActions, isRTL && styles.rtl]}>
-                          {answer.isAccepted && (
-                            <View style={[styles.acceptedBadge, { backgroundColor: theme.success + '20' }]}>
-                              <CheckCircle size={12} color={theme.success} />
-                              <Text style={[styles.acceptedText, { color: theme.success }]}>
-                                {language === 'ar' ? 'مقبول' : 'Accepted'}
-                              </Text>
-                            </View>
-                          )}
-                          <TouchableOpacity
-                            style={[styles.actionIconBtn, { backgroundColor: '#EF444415' }]}
-                            onPress={() => {
-                              showAlert(
-                                language === 'ar' ? 'حذف الإجابة' : 'Delete Answer',
-                                language === 'ar' ? 'هل أنت متأكد من حذف هذه الإجابة؟' : 'Are you sure you want to delete this answer?',
-                                [
-                                  { text: t.cancel, style: 'cancel' },
-                                  {
-                                    text: t.delete,
-                                    style: 'destructive',
-                                    onPress: () => deleteAnswer(answer.id),
-                                  },
-                                ]
-                              );
-                            }}
-                          >
-                            <Trash2 size={14} color="#EF4444" />
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    ))}
                   </View>
+                  <View style={[styles.qaMetaItem, isRTL && styles.rtl]}>
+                    <MessageSquare size={14} color={theme.textSecondary} />
+                    <Text style={[styles.qaMetaText, { color: theme.textSecondary }]}>
+                      {questionAnswers.length}
+                    </Text>
+                  </View>
+                  <View style={[styles.qaMetaItem, isRTL && styles.rtl]}>
+                    <Activity size={14} color={theme.textSecondary} />
+                    <Text style={[styles.qaMetaText, { color: theme.textSecondary }]}>
+                      {question.votes}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Expand/Collapse Answers */}
+                {questionAnswers.length > 0 && (
+                  <>
+                    <TouchableOpacity
+                      style={[styles.qaExpandBtn, { borderColor: theme.border }]}
+                      onPress={() => toggleExpandQuestion(question.id)}
+                    >
+                      <Text style={[styles.qaExpandText, { color: theme.primary }]}>
+                        {isExpanded 
+                          ? (language === 'ar' ? 'إخفاء الإجابات' : 'Hide Answers')
+                          : (language === 'ar' ? `عرض ${questionAnswers.length} إجابات` : `Show ${questionAnswers.length} Answers`)
+                        }
+                      </Text>
+                      <ChevronRight 
+                        size={16} 
+                        color={theme.primary} 
+                        style={{ transform: [{ rotate: isExpanded ? '90deg' : '0deg' }] }}
+                      />
+                    </TouchableOpacity>
+
+                    {/* Answers List - Expandable */}
+                    {isExpanded && (
+                      <View style={styles.qaAnswersList}>
+                        {questionAnswers.map((answer, index) => {
+                          const answerUser = users.find(u => u.id === answer.userId);
+                          return (
+                            <View 
+                              key={answer.id} 
+                              style={[
+                                styles.qaAnswerCard, 
+                                { backgroundColor: theme.backgroundSecondary },
+                                answer.isAccepted && { borderLeftWidth: 3, borderLeftColor: theme.success }
+                              ]}
+                            >
+                              {/* Answer Header */}
+                              <View style={[styles.qaAnswerHeader, isRTL && styles.rtl]}>
+                                <View style={[styles.qaAnswerUser, isRTL && styles.rtl]}>
+                                  <View style={[styles.qaAnswerAvatar, { backgroundColor: theme.primary + '20' }]}>
+                                    <Text style={[styles.qaAnswerAvatarText, { color: theme.primary }]}>
+                                      {(answerUser?.name || 'U')[0].toUpperCase()}
+                                    </Text>
+                                  </View>
+                                  <View>
+                                    <Text style={[styles.qaAnswerUserName, { color: theme.text }]}>
+                                      {answerUser?.name || (language === 'ar' ? 'مستخدم' : 'User')}
+                                    </Text>
+                                    {answer.isAccepted && (
+                                      <View style={[styles.qaAcceptedBadge, isRTL && styles.rtl]}>
+                                        <CheckCircle size={10} color={theme.success} />
+                                        <Text style={[styles.qaAcceptedText, { color: theme.success }]}>
+                                          {language === 'ar' ? 'أفضل إجابة' : 'Best Answer'}
+                                        </Text>
+                                      </View>
+                                    )}
+                                  </View>
+                                </View>
+                                <TouchableOpacity
+                                  style={[styles.qaAnswerDeleteBtn]}
+                                  onPress={() => {
+                                    showAlert(
+                                      language === 'ar' ? 'حذف الإجابة' : 'Delete Answer',
+                                      language === 'ar' ? 'هل أنت متأكد من حذف هذه الإجابة؟' : 'Delete this answer?',
+                                      [
+                                        { text: t.cancel, style: 'cancel' },
+                                        {
+                                          text: t.delete,
+                                          style: 'destructive',
+                                          onPress: () => deleteAnswer(answer.id),
+                                        },
+                                      ]
+                                    );
+                                  }}
+                                >
+                                  <Trash2 size={14} color="#EF4444" />
+                                </TouchableOpacity>
+                              </View>
+
+                              {/* Answer Content */}
+                              <Text style={[styles.qaAnswerContent, { color: theme.text }]}>
+                                {answer.content}
+                              </Text>
+
+                              {/* Answer Meta */}
+                              <View style={[styles.qaAnswerMeta, isRTL && styles.rtl]}>
+                                <Text style={[styles.qaAnswerMetaText, { color: theme.textSecondary }]}>
+                                  {answer.votes} {language === 'ar' ? 'صوت' : 'votes'}
+                                </Text>
+                              </View>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    )}
+                  </>
                 )}
               </View>
-              
-              <View style={styles.listItemActions}>
-                <TouchableOpacity
-                  style={[styles.actionIconBtn, { backgroundColor: '#EF444415' }]}
-                  onPress={() => {
-                    showAlert(
-                      language === 'ar' ? 'حذف السؤال' : 'Delete Question',
-                      language === 'ar' ? 'هل أنت متأكد من حذف هذا السؤال وجميع إجاباته؟' : 'Are you sure you want to delete this question and all its answers?',
-                      [
-                        { text: t.cancel, style: 'cancel' },
-                        {
-                          text: t.delete,
-                          style: 'destructive',
-                          onPress: () => deleteQuestion(question.id),
-                        },
-                      ]
-                    );
-                  }}
-                >
-                  <Trash2 size={16} color="#EF4444" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          );
-        })
-      )}
-    </View>
+            );
+          })
+        )}
+      </View>
   );
 
   const renderContact = () => (
@@ -1861,52 +1972,158 @@ const styles = StyleSheet.create({
   listItemSubtitle: {
     fontSize: 13,
   },
-  questionMeta: {
+  // Q&A Styles
+  qaStats: {
     flexDirection: 'row',
-    gap: 16,
-    marginTop: 8,
-  },
-  metaText: {
-    fontSize: 12,
-  },
-  answersContainer: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.1)',
-  },
-  answersTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  answerItem: {
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  answerText: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  answerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    marginTop: 8,
     gap: 8,
   },
-  acceptedBadge: {
+  qaStat: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  qaStatNumber: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  qaStatLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  qaCard: {
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  qaCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  qaStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  qaStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  qaDeleteBtn: {
+    padding: 8,
+    borderRadius: 8,
+  },
+  qaTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    lineHeight: 22,
+    marginBottom: 8,
+  },
+  qaContent: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  qaMetaRow: {
+    flexDirection: 'row',
+    gap: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.06)',
+  },
+  qaMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  qaMetaText: {
+    fontSize: 13,
+  },
+  qaExpandBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 12,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+  },
+  qaExpandText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  qaAnswersList: {
+    marginTop: 12,
+    gap: 10,
+  },
+  qaAnswerCard: {
+    padding: 14,
     borderRadius: 12,
   },
-  acceptedText: {
-    fontSize: 11,
+  qaAnswerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+  qaAnswerUser: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  qaAnswerAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  qaAnswerAvatarText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  qaAnswerUserName: {
+    fontSize: 13,
     fontWeight: '600',
+  },
+  qaAcceptedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  qaAcceptedText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  qaAnswerDeleteBtn: {
+    padding: 6,
+  },
+  qaAnswerContent: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  qaAnswerMeta: {
+    flexDirection: 'row',
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.06)',
+  },
+  qaAnswerMetaText: {
+    fontSize: 12,
   },
   listItemActions: {
     flexDirection: 'row',
